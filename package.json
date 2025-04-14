@@ -1,6 +1,6 @@
 {
   "name": "install-mcp",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A CLI tool to install and manage MCP servers.",
   "bin": {
     "install-mcp": "./bin/run"
@@ -39,7 +39,7 @@
     "typescript",
     "starter",
     "cli",
-    "bootstrap"
+    "mcp"
   ],
   "author": "Dhravya Shah <dhravyashah@gmail.com>",
   "license": "MIT",
