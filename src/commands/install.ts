@@ -1,6 +1,6 @@
 import type { ArgumentsCamelCase, Argv } from 'yargs'
 import { logger } from '../logger'
-import { bold, green, red } from 'picocolors'
+import { green, red } from 'picocolors'
 import { clientNames, readConfig, writeConfig } from '../client-config'
 
 interface InstallArgv {
@@ -75,11 +75,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         writeConfig(config, argv.client)
       }
 
-      logger.box(
-        green(
-          `The cli project created at ${argv.client} folder.\n Go to the folder and run ${bold('pnpm install')} to start!\n Enjoy your coding!`,
-        ),
-      )
+      logger.box(green(`Successfully installed MCP server ${target} in ${argv.client}.`))
     } catch (e) {
       logger.error(red((e as Error).message))
     }
