@@ -7,10 +7,10 @@ Installing MCPs is a huge pain, so I made a CLI tool to make it easier.
 ## Usage
 
 Just run
-`npx install-mcp i '<command>' --client <client>`
+`npx install-mcp '<command>' --client <client>`
 
 Also works with SSE URLs
-`npx install-mcp i 'https://<url>' --client <client>`
+`npx install-mcp '<url>' --client <client>`
 
 where `<client>` is one of the following:
 

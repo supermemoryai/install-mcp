@@ -3,7 +3,7 @@ import { logger } from '../logger'
 import { green, red } from 'picocolors'
 import { clientNames, readConfig, writeConfig } from '../client-config'
 
-interface InstallArgv {
+export interface InstallArgv {
   target?: string
   name?: string
   client: string
