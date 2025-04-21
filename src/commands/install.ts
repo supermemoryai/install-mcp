@@ -7,6 +7,7 @@ export interface InstallArgv {
   target?: string
   name?: string
   client: string
+  local?: boolean
 }
 
 export const command = 'install [target]'
@@ -27,6 +28,11 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       type: 'string',
       description: 'Client to use for installation',
       demandOption: true,
+    })
+    .option('local', {
+      type: 'boolean',
+      description: 'Install to the local directory instead of the default location',
+      default: false,
     })
 }
 
@@ -50,12 +56,15 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     })) as string
   }
 
-  const ready = await logger.prompt(green(`Are you ready to install MCP server ${target} in ${argv.client}?`), {
-    type: 'confirm',
-  })
+  const ready = await logger.prompt(
+    green(`Are you ready to install MCP server ${target} in ${argv.client}${argv.local ? ' (locally)' : ''}?`),
+    {
+      type: 'confirm',
+    },
+  )
   if (ready) {
     try {
-      const config = readConfig(argv.client)
+      const config = readConfig(argv.client, argv.local)
 
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
@@ -63,7 +72,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           command: 'npx',
           args: ['-y', 'supergateway', '--sse', target],
         }
-        writeConfig(config, argv.client)
+        writeConfig(config, argv.client, argv.local)
       }
 
       // if it is a command, add it to config
@@ -72,10 +81,12 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           command: target.split(' ')[0],
           args: target.split(' ').slice(1),
         }
-        writeConfig(config, argv.client)
+        writeConfig(config, argv.client, argv.local)
       }
 
-      logger.box(green(`Successfully installed MCP server ${target} in ${argv.client}.`))
+      logger.box(
+        green(`Successfully installed MCP server ${target} in ${argv.client}${argv.local ? ' (locally)' : ''}.`),
+      )
     } catch (e) {
       logger.error(red((e as Error).message))
     }
