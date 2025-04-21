@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import process from 'node:process'
 
 import { verbose } from './logger'
 // import { execFileSync } from "node:child_process"
@@ -13,6 +14,7 @@ export interface ClientConfig {
 interface ClientFileTarget {
   type: 'file'
   path: string
+  localPath?: string
 }
 type ClientInstallTarget = ClientFileTarget
 
@@ -58,28 +60,40 @@ const clientPaths: { [key: string]: ClientInstallTarget } = {
     type: 'file',
     path: path.join(homeDir, '.config', 'enconvo', 'mcp_config.json'),
   },
-  cursor: { type: 'file', path: path.join(homeDir, '.cursor', 'mcp.json') },
+  cursor: {
+    type: 'file',
+    path: path.join(homeDir, '.cursor', 'mcp.json'),
+    localPath: path.join(process.cwd(), '.cursor', 'mcp.json'),
+  },
 }
 
 export const clientNames = Object.keys(clientPaths)
 
-export function getConfigPath(client?: string): ClientInstallTarget {
+export function getConfigPath(client?: string, local?: boolean): ClientInstallTarget {
   const normalizedClient = client?.toLowerCase() || 'claude'
-  verbose(`Getting config path for client: ${normalizedClient}`)
+  verbose(`Getting config path for client: ${normalizedClient}${local ? ' (local)' : ''}`)
 
-  const configTarget = clientPaths[normalizedClient] || {
-    type: 'file',
-    path: path.join(path.dirname(defaultClaudePath), '..', client || 'claude', `${normalizedClient}_config.json`),
+  const configTarget = clientPaths[normalizedClient]
+  if (!configTarget) {
+    return {
+      type: 'file',
+      path: path.join(path.dirname(defaultClaudePath), '..', client || 'claude', `${normalizedClient}_config.json`),
+    }
   }
 
-  verbose(`Config path resolved to: ${JSON.stringify(configTarget)}`)
+  if (local && configTarget.localPath) {
+    verbose(`Using local config path for ${normalizedClient}: ${configTarget.localPath}`)
+    return { ...configTarget, path: configTarget.localPath }
+  }
+
+  verbose(`Using default config path for ${normalizedClient}: ${configTarget.path}`)
   return configTarget
 }
 
-export function readConfig(client: string): ClientConfig {
-  verbose(`Reading config for client: ${client}`)
+export function readConfig(client: string, local?: boolean): ClientConfig {
+  verbose(`Reading config for client: ${client}${local ? ' (local)' : ''}`)
   try {
-    const configPath = getConfigPath(client)
+    const configPath = getConfigPath(client, local)
 
     verbose(`Checking if config file exists at: ${configPath.path}`)
     if (!fs.existsSync(configPath.path)) {
@@ -101,8 +115,8 @@ export function readConfig(client: string): ClientConfig {
   }
 }
 
-export function writeConfig(config: ClientConfig, client?: string): void {
-  verbose(`Writing config for client: ${client || 'default'}`)
+export function writeConfig(config: ClientConfig, client?: string, local?: boolean): void {
+  verbose(`Writing config for client: ${client || 'default'}${local ? ' (local)' : ''}`)
   verbose(`Config data: ${JSON.stringify(config, null, 2)}`)
 
   if (!config.mcpServers || typeof config.mcpServers !== 'object') {
@@ -110,7 +124,7 @@ export function writeConfig(config: ClientConfig, client?: string): void {
     throw new Error('Invalid mcpServers structure')
   }
 
-  const configPath = getConfigPath(client)
+  const configPath = getConfigPath(client, local)
 
   writeConfigFile(config, configPath)
 }
