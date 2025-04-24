@@ -9,7 +9,7 @@ module.exports = {
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'prettier'],
   rules: {
     'no-console': 1,
-    'prettier/prettier': 2,
+    'prettier/prettier': ['error', { endOfLine: 'auto' }],
     '@typescript-eslint/no-unused-vars': 'off',
     'unused-imports/no-unused-imports': 'error',
   },
