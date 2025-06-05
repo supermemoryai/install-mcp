@@ -20,6 +20,7 @@ where `<client>` is one of the following:
 - `windsurf`
 - `witsy`
 - `enconvo`
+- `cursor`
 
 ## License
 
