@@ -11,15 +11,14 @@ export interface InstallArgv {
   yes?: boolean
 }
 
-export const command = 'install [target]'
+export const command = '$0 [target]'
 export const describe = 'Install MCP server'
-export const aliases = ['i']
 
 export function builder(yargs: Argv<InstallArgv>): Argv {
   return yargs
     .positional('target', {
       type: 'string',
-      description: 'Installation target (URL or command)',
+      description: 'Package name, full command, or URL to install',
     })
     .option('name', {
       type: 'string',
@@ -43,6 +42,53 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
     })
 }
 
+function isUrl(input: string): boolean {
+  return input.startsWith('http://') || input.startsWith('https://')
+}
+
+function isCommand(input: string): boolean {
+  return input.includes(' ') || input.startsWith('npx ') || input.startsWith('node ')
+}
+
+function inferNameFromInput(input: string): string {
+  if (isUrl(input)) {
+    // For URLs like https://example.com/path -> example-com
+    try {
+      const url = new URL(input)
+      return url.hostname.replace(/\./g, '-')
+    } catch {
+      // Fallback for malformed URLs
+      const parts = input.split('/')
+      return parts[parts.length - 1] || 'server'
+    }
+  } else if (isCommand(input)) {
+    // For commands, extract package name
+    const parts = input.split(' ')
+    if (parts[0] === 'npx' && parts.length > 1) {
+      // Skip flags like -y and get the package name
+      const packageIndex = parts.findIndex((part, index) => index > 0 && !part.startsWith('-'))
+      if (packageIndex !== -1) {
+        return parts[packageIndex]!
+      }
+    }
+    return parts[0]!
+  } else {
+    // Simple package name like "mcp-server" or "@org/mcp-server"
+    return input
+  }
+}
+
+function buildCommand(input: string): string {
+  if (isUrl(input)) {
+    return input // URLs are handled separately
+  } else if (isCommand(input)) {
+    return input // Already a full command
+  } else {
+    // Simple package name, convert to npx command
+    return `npx ${input}`
+  }
+}
+
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   if (!argv.client || !clientNames.includes(argv.client)) {
     logger.error(`Invalid client: ${argv.client}. Available clients: ${clientNames.join(', ')}`)
@@ -51,50 +97,20 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   let target = argv.target
   if (!target) {
-    target = (await logger.prompt('Enter the installation target (URL or command):', {
+    target = (await logger.prompt('Enter the package name, command, or URL:', {
       type: 'text',
     })) as string
   }
 
-  let name = argv.name
-  if (!name) {
-    // Auto-extract name from target
-    if (target.startsWith('http') || target.startsWith('https')) {
-      // For URLs, try to extract from the last part of the path
-      const urlParts = target.split('/')
-      name = urlParts[urlParts.length - 1] || 'server'
-    } else {
-      // For commands, try to extract package name
-      const parts = target.split(' ')
-      if (parts[0] === 'npx' && parts.length > 1) {
-        // Skip flags like -y and get the package name
-        const packageIndex = parts.findIndex((part, index) => index > 0 && !part.startsWith('-'))
-        if (packageIndex !== -1) {
-          name = parts[packageIndex]
-        } else {
-          name = parts[parts.length - 1]
-        }
-      } else {
-        name = parts[0]
-      }
-    }
+  const name = argv.name || inferNameFromInput(target)
+  const command = buildCommand(target)
 
-    // If we still don't have a name, prompt for it
-    if (!name || name === '') {
-      name = (await logger.prompt('Enter the name of the server:', {
-        type: 'text',
-      })) as string
-    }
-  }
-
-  logger.info(`Installing MCP server ${argv.client} with target ${argv.target} and name ${name}`)
+  logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? ' (locally)' : ''}`)
 
   let ready = argv.yes
   if (!ready) {
     ready = await logger.prompt(
-      green(
-        `Are you ready to install MCP server "${name}" (${target}) in ${argv.client}${argv.local ? ' (locally)' : ''}?`,
-      ),
+      green(`Install MCP server "${name}" in ${argv.client}?`),
       {
         type: 'confirm',
       },
@@ -105,28 +121,24 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     try {
       const config = readConfig(argv.client, argv.local)
 
-      // if it is a URL, add it to config
-      if (target.startsWith('http') || target.startsWith('https')) {
+      if (isUrl(target)) {
+        // URL-based installation
         config.mcpServers[name] = {
           command: 'npx',
           args: ['-y', 'supergateway', '--sse', target],
         }
-        writeConfig(config, argv.client, argv.local)
-      }
-
-      // if it is a command, add it to config
-      else {
+      } else {
+        // Command-based installation (including simple package names)
+        const cmdParts = command.split(' ')
         config.mcpServers[name] = {
-          command: target.split(' ')[0],
-          args: target.split(' ').slice(1),
+          command: cmdParts[0],
+          args: cmdParts.slice(1),
         }
-        writeConfig(config, argv.client, argv.local)
       }
 
+      writeConfig(config, argv.client, argv.local)
       logger.box(
-        green(
-          `Successfully installed MCP server "${name}" (${target}) in ${argv.client}${argv.local ? ' (locally)' : ''}.`,
-        ),
+        green(`Successfully installed MCP server "${name}" in ${argv.client}${argv.local ? ' (locally)' : ''}`),
       )
     } catch (e) {
       logger.error(red((e as Error).message))
