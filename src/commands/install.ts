@@ -9,6 +9,8 @@ export interface InstallArgv {
   client: string
   local?: boolean
   yes?: boolean
+  gateway?: string
+  host?: string
 }
 
 export const command = 'install [target]'
@@ -29,6 +31,23 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       type: 'string',
       description: 'Client to use for installation',
       demandOption: true,
+    })
+    .option('yes', {
+      type: 'boolean',
+      alias: 'y',
+      description: 'Skip confirmation prompt',
+      default: false,
+    })
+    .option('gateway', {
+      type: 'string',
+      description: 'Gateway to use for installation (defaults to mcp-remote@latest)',
+      default: 'mcp-remote@latest',
+    })
+    .option('host', {
+      type: 'string',
+      description: 'Host to use for installation (e.g., 127.0.0.1)',
+      alias: 'h',
+      default: '127.0.0.1',
     })
     .option('local', {
       type: 'boolean',
@@ -87,6 +106,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     }
   }
 
+  if (argv.host) {
+    logger.info(`Using host ${argv.host}`)
+  }
+
   logger.info(`Installing MCP server ${argv.client} with target ${argv.target} and name ${name}`)
 
   let ready = argv.yes
@@ -107,9 +130,11 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
+        const gatewayArgs = argv.gateway ? [argv.gateway] : ['supergateway']
+        const hostArg = argv.host ? [`--host`, argv.host] : []
         config.mcpServers[name] = {
           command: 'npx',
-          args: ['-y', 'supergateway', '--sse', target],
+          args: ['-y', ...gatewayArgs, target, ...hostArg],
         }
         writeConfig(config, argv.client, argv.local)
       }
