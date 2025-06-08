@@ -9,6 +9,8 @@ export interface InstallArgv {
   client: string
   local?: boolean
   yes?: boolean
+  gateway?: string
+  args?: string
 }
 
 export const command = 'install [target]'
@@ -40,6 +42,15 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       alias: 'y',
       description: 'Skip confirmation prompt',
       default: false,
+    })
+    .option('gateway', {
+      type: 'string',
+      description: 'Gateway package to use (defaults to mcp-remote@latest)',
+      default: 'mcp-remote@latest',
+    })
+    .option('args', {
+      type: 'string',
+      description: 'Additional arguments to pass to the gateway',
     })
 }
 
@@ -107,9 +118,13 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
+        const gatewayArgs = ['npx', '-y', argv.gateway || 'mcp-remote@latest', '--sse', target]
+        if (argv.args) {
+          gatewayArgs.push(...argv.args.split(' '))
+        }
         config.mcpServers[name] = {
           command: 'npx',
-          args: ['-y', 'supergateway', '--sse', target],
+          args: gatewayArgs,
         }
         writeConfig(config, argv.client, argv.local)
       }
