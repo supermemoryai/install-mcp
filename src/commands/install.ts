@@ -60,6 +60,15 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Skip confirmation prompt',
       default: false,
     })
+    .option('gateway', {
+      type: 'string',
+      description: 'Gateway package to use (defaults to mcp-remote@latest)',
+      default: 'mcp-remote@latest',
+    })
+    .option('args', {
+      type: 'string',
+      description: 'Additional arguments to pass to the gateway',
+    })
 }
 
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
