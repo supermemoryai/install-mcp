@@ -26,6 +26,7 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
     .option('name', {
       type: 'string',
       description: 'Name of the server (auto-extracted from target if not provided)',
+      default: 'spydr-memory',
     })
     .option('client', {
       type: 'string',
@@ -90,7 +91,11 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     if (target.startsWith('http') || target.startsWith('https')) {
       // For URLs, try to extract from the last part of the path
       const urlParts = target.split('/')
-      name = urlParts[urlParts.length - 1] || 'server'
+      if (urlParts.length > 3) {
+        name = urlParts[urlParts.length - 2]
+      } else {
+        name = urlParts[urlParts.length - 1]
+      }
     } else {
       // For commands, try to extract package name
       const parts = target.split(' ')
@@ -139,7 +144,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
-        const gatewayArgs = argv.gateway ? [argv.gateway] : ['supergateway']
+        const gatewayArgs = argv.gateway ? [argv.gateway] : ['mcp-remote@latest']
         const hostArg = argv.host ? [`--host`, argv.host] : []
         config.mcpServers[name] = {
           command: 'npx',
