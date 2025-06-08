@@ -1,9 +1,9 @@
 {
-  "name": "install-mcp",
-  "version": "1.0.6",
+  "name": "@spydr/mcp-i",
+  "version": "1.0.0",
   "description": "A CLI tool to install and manage MCP servers.",
   "bin": {
-    "install-mcp": "./bin/run"
+    "mcp-i": "./bin/run"
   },
   "directories": {
     "lib": "src",
@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/dhravya/install-mcp.git"
+    "url": "git+ssh://git@github.com/Fadeleke57/mcp-i.git"
   },
   "scripts": {
     "build": "tsup-node",
@@ -41,7 +41,7 @@
     "cli",
     "mcp"
   ],
-  "author": "Dhravya Shah <dhravyashah@gmail.com>",
+  "author": "Farouk Adeleke <fadeleke57@gmail.com>",
   "license": "MIT",
   "devDependencies": {
     "@commitlint/cli": "^18.6.1",
