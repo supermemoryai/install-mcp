@@ -109,12 +109,9 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   let ready = argv.yes
   if (!ready) {
-    ready = await logger.prompt(
-      green(`Install MCP server "${name}" in ${argv.client}?`),
-      {
-        type: 'confirm',
-      },
-    )
+    ready = await logger.prompt(green(`Install MCP server "${name}" in ${argv.client}?`), {
+      type: 'confirm',
+    })
   }
 
   if (ready) {

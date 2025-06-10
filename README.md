@@ -9,26 +9,31 @@ Installing MCPs is a huge pain, so I made a CLI tool to make it easier.
 The CLI now supports multiple installation methods with automatic detection:
 
 ### Simple package names
+
 ```bash
 npx install-mcp mcp-package-name --client claude
 ```
 
 ### Scoped packages
+
 ```bash
 npx install-mcp @org/mcp-server --client claude
 ```
 
 ### Full commands (for custom arguments)
+
 ```bash
 npx install-mcp 'npx some-mcp-server --custom-args' --client claude
 ```
 
 ### SSE URLs (with automatic naming)
+
 ```bash
 npx install-mcp https://mcp.example.com/server/sse --client claude
 ```
 
 The tool automatically:
+
 - Converts simple package names to `npx package-name`
 - Preserves full commands as-is
 - Infers server names from package names or URLs (e.g., `mcp.example.com` → `mcp-example-com`)
