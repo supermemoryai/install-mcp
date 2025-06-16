@@ -120,9 +120,15 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       if (isUrl(target)) {
         // URL-based installation
-        config.mcpServers[name] = {
-          command: 'npx',
-          args: ['-y', 'supergateway', '--sse', target],
+        if (argv.client === 'cursor' || argv.client === 'claude') {
+          config.mcpServers[name] = {
+            url: target,
+          }
+        } else {
+          config.mcpServers[name] = {
+            command: 'npx',
+            args: ['-y', 'supergateway', '--sse', target],
+          }
         }
       } else {
         // Command-based installation (including simple package names)
