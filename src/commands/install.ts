@@ -130,7 +130,6 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
             args: ['-y', 'supergateway', '--sse', target],
           }
         }
-        writeConfig(config, argv.client, argv.local)
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
