@@ -65,6 +65,10 @@ const clientPaths: { [key: string]: ClientInstallTarget } = {
     path: path.join(homeDir, '.cursor', 'mcp.json'),
     localPath: path.join(process.cwd(), '.cursor', 'mcp.json'),
   },
+  warp: {
+    type: 'file',
+    path: 'no-local-config', // it's okay this isn't a real path, we never use it
+  },
 }
 
 export const clientNames = Object.keys(clientPaths)

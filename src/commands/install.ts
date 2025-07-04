@@ -1,6 +1,6 @@
 import type { ArgumentsCamelCase, Argv } from 'yargs'
 import { logger } from '../logger'
-import { green, red } from 'picocolors'
+import { blue, green, red } from 'picocolors'
 import { clientNames, readConfig, writeConfig } from '../client-config'
 
 export interface InstallArgv {
@@ -104,6 +104,32 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
+
+  if (argv.client === 'warp') {
+    logger.log('')
+    logger.info('Warp requires a manual installation through their UI.')
+    logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
+    logger.log(
+      JSON.stringify(
+        {
+          [name]: {
+            command: isUrl(target) ? 'npx' : command.split(' ')[0],
+            args: isUrl(target) ? ['-y', 'supergateway', '--sse', target] : command.split(' ').slice(1),
+            env: {},
+            working_directory: null,
+            start_on_launch: true,
+          },
+        },
+        null,
+        2,
+      )
+        .split('\n')
+        .map((line) => green('  ' + line))
+        .join('\n'),
+    )
+    logger.box("Read Warp's documentation at", blue('https://docs.warp.dev/knowledge-and-collaboration/mcp'))
+    return
+  }
 
   logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? ' (locally)' : ''}`)
 
