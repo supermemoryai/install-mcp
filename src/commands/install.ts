@@ -1,7 +1,35 @@
 import type { ArgumentsCamelCase, Argv } from 'yargs'
 import { logger } from '../logger'
 import { blue, green, red } from 'picocolors'
-import { clientNames, readConfig, writeConfig } from '../client-config'
+import {
+  clientNames,
+  readConfig,
+  writeConfig,
+  getConfigPath,
+  getNestedValue,
+  setNestedValue,
+  type ClientConfig,
+} from '../client-config'
+
+// Helper to set a server config in a nested structure
+function setServerConfig(
+  config: ClientConfig,
+  configKey: string,
+  serverName: string,
+  serverConfig: ClientConfig,
+): void {
+  // Get or create the nested config object
+  let servers = getNestedValue(config, configKey)
+  if (!servers) {
+    setNestedValue(config, configKey, {})
+    servers = getNestedValue(config, configKey)
+  }
+
+  // Set the server config
+  if (servers) {
+    servers[serverName] = serverConfig
+  }
+}
 
 export interface InstallArgv {
   target?: string
@@ -143,26 +171,28 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   if (ready) {
     try {
       const config = readConfig(argv.client, argv.local)
+      const configPath = getConfigPath(argv.client, argv.local)
+      const configKey = configPath.configKey
 
       if (isUrl(target)) {
         // URL-based installation
-        if (argv.client === 'cursor' || argv.client === 'claude') {
-          config.mcpServers[name] = {
+        if (['cursor', 'claude', 'vscode'].includes(argv.client)) {
+          setServerConfig(config, configKey, name, {
             url: target,
-          }
+          })
         } else {
-          config.mcpServers[name] = {
+          setServerConfig(config, configKey, name, {
             command: 'npx',
             args: ['-y', 'supergateway', '--sse', target],
-          }
+          })
         }
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
-        config.mcpServers[name] = {
+        setServerConfig(config, configKey, name, {
           command: cmdParts[0],
           args: cmdParts.slice(1),
-        }
+        })
       }
 
       writeConfig(config, argv.client, argv.local)
