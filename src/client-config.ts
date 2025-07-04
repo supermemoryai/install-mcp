@@ -69,6 +69,11 @@ const clientPaths: { [key: string]: ClientInstallTarget } = {
     type: 'file',
     path: 'no-local-config', // it's okay this isn't a real path, we never use it
   },
+  'gemini-cli': {
+    type: 'file',
+    path: path.join(homeDir, '.gemini', 'settings.json'),
+    localPath: path.join(process.cwd(), '.gemini', 'settings.json'),
+  },
 }
 
 export const clientNames = Object.keys(clientPaths)
