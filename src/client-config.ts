@@ -102,6 +102,12 @@ const clientPaths: { [key: string]: ClientInstallTarget } = {
     localPath: path.join(process.cwd(), '.vscode', 'settings.json'),
     configKey: 'mcp.servers',
   },
+  'claude-code': {
+    type: 'file',
+    path: path.join(homeDir, '.claude.json'),
+    localPath: path.join(process.cwd(), '.mcp.json'),
+    configKey: 'mcpServers',
+  },
 }
 
 export const clientNames = Object.keys(clientPaths)
