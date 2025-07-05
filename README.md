@@ -48,6 +48,9 @@ where `<client>` is one of the following:
 - `witsy`
 - `enconvo`
 - `cursor`
+- `vscode`
+- `gemini-cli`
+- `claude-code`
 - `warp` (outputs config to copy/paste into Warp's cloud-based settings)
 
 ## License
