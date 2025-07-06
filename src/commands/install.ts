@@ -1,7 +1,35 @@
 import type { ArgumentsCamelCase, Argv } from 'yargs'
 import { logger } from '../logger'
-import { green, red } from 'picocolors'
-import { clientNames, readConfig, writeConfig } from '../client-config'
+import { blue, green, red } from 'picocolors'
+import {
+  clientNames,
+  readConfig,
+  writeConfig,
+  getConfigPath,
+  getNestedValue,
+  setNestedValue,
+  type ClientConfig,
+} from '../client-config'
+
+// Helper to set a server config in a nested structure
+function setServerConfig(
+  config: ClientConfig,
+  configKey: string,
+  serverName: string,
+  serverConfig: ClientConfig,
+): void {
+  // Get or create the nested config object
+  let servers = getNestedValue(config, configKey)
+  if (!servers) {
+    setNestedValue(config, configKey, {})
+    servers = getNestedValue(config, configKey)
+  }
+
+  // Set the server config
+  if (servers) {
+    servers[serverName] = serverConfig
+  }
+}
 
 export interface InstallArgv {
   target?: string
@@ -105,6 +133,32 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
 
+  if (argv.client === 'warp') {
+    logger.log('')
+    logger.info('Warp requires a manual installation through their UI.')
+    logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
+    logger.log(
+      JSON.stringify(
+        {
+          [name]: {
+            command: isUrl(target) ? 'npx' : command.split(' ')[0],
+            args: isUrl(target) ? ['-y', 'supergateway', '--sse', target] : command.split(' ').slice(1),
+            env: {},
+            working_directory: null,
+            start_on_launch: true,
+          },
+        },
+        null,
+        2,
+      )
+        .split('\n')
+        .map((line) => green('  ' + line))
+        .join('\n'),
+    )
+    logger.box("Read Warp's documentation at", blue('https://docs.warp.dev/knowledge-and-collaboration/mcp'))
+    return
+  }
+
   logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? ' (locally)' : ''}`)
 
   let ready = argv.yes
@@ -117,26 +171,28 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   if (ready) {
     try {
       const config = readConfig(argv.client, argv.local)
+      const configPath = getConfigPath(argv.client, argv.local)
+      const configKey = configPath.configKey
 
       if (isUrl(target)) {
         // URL-based installation
-        if (argv.client === 'cursor' || argv.client === 'claude') {
-          config.mcpServers[name] = {
+        if (['cursor', 'claude', 'vscode'].includes(argv.client)) {
+          setServerConfig(config, configKey, name, {
             url: target,
-          }
+          })
         } else {
-          config.mcpServers[name] = {
+          setServerConfig(config, configKey, name, {
             command: 'npx',
             args: ['-y', 'supergateway', '--sse', target],
-          }
+          })
         }
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
-        config.mcpServers[name] = {
+        setServerConfig(config, configKey, name, {
           command: cmdParts[0],
           args: cmdParts.slice(1),
-        }
+        })
       }
 
       writeConfig(config, argv.client, argv.local)
