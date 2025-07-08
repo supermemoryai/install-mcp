@@ -20,97 +20,107 @@ interface ClientFileTarget {
 type ClientInstallTarget = ClientFileTarget
 
 // Initialize platform-specific paths
-const homeDir = os.homedir()
-
-const platformPaths = {
-  win32: {
-    baseDir: process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'),
-    vscodePath: path.join('Code', 'User'),
-  },
-  darwin: {
-    baseDir: path.join(homeDir, 'Library', 'Application Support'),
-    vscodePath: path.join('Code', 'User'),
-  },
-  linux: {
-    baseDir: process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config'),
-    vscodePath: path.join('Code/User'),
-  },
+function getPlatformPaths() {
+  const homeDir = os.homedir()
+  return {
+    win32: {
+      baseDir: process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'),
+      vscodePath: path.join('Code', 'User'),
+    },
+    darwin: {
+      baseDir: path.join(homeDir, 'Library', 'Application Support'),
+      vscodePath: path.join('Code', 'User'),
+    },
+    linux: {
+      baseDir: process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config'),
+      vscodePath: path.join('Code/User'),
+    },
+  }
 }
 
-const platform = process.platform as keyof typeof platformPaths
-const { baseDir, vscodePath } = platformPaths[platform]
-const defaultClaudePath = path.join(baseDir, 'Claude', 'claude_desktop_config.json')
+function getBasePaths() {
+  const platformPaths = getPlatformPaths()
+  const platform = process.platform as keyof typeof platformPaths
+  const { baseDir, vscodePath } = platformPaths[platform]
+  const defaultClaudePath = path.join(baseDir, 'Claude', 'claude_desktop_config.json')
+  return { baseDir, vscodePath, defaultClaudePath }
+}
 
 // Define client paths using the platform-specific base directories
-const clientPaths: { [key: string]: ClientInstallTarget } = {
-  claude: { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
-  cline: {
-    type: 'file',
-    path: path.join(
-      baseDir,
-      vscodePath,
-      'globalStorage',
-      'saoudrizwan.claude-dev',
-      'settings',
-      'cline_mcp_settings.json',
-    ),
-    configKey: 'mcpServers',
-  },
-  'roo-cline': {
-    type: 'file',
-    path: path.join(
-      baseDir,
-      vscodePath,
-      'globalStorage',
-      'rooveterinaryinc.roo-cline',
-      'settings',
-      'mcp_settings.json',
-    ),
-    configKey: 'mcpServers',
-  },
-  windsurf: {
-    type: 'file',
-    path: path.join(homeDir, '.codeium', 'windsurf', 'mcp_config.json'),
-    configKey: 'mcpServers',
-  },
-  witsy: { type: 'file', path: path.join(baseDir, 'Witsy', 'settings.json'), configKey: 'mcpServers' },
-  enconvo: {
-    type: 'file',
-    path: path.join(homeDir, '.config', 'enconvo', 'mcp_config.json'),
-    configKey: 'mcpServers',
-  },
-  cursor: {
-    type: 'file',
-    path: path.join(homeDir, '.cursor', 'mcp.json'),
-    localPath: path.join(process.cwd(), '.cursor', 'mcp.json'),
-    configKey: 'mcpServers',
-  },
-  warp: {
-    type: 'file',
-    path: 'no-local-config', // it's okay this isn't a real path, we never use it
-    configKey: 'mcpServers',
-  },
-  'gemini-cli': {
-    type: 'file',
-    path: path.join(homeDir, '.gemini', 'settings.json'),
-    localPath: path.join(process.cwd(), '.gemini', 'settings.json'),
-    configKey: 'mcpServers',
-  },
-  vscode: {
-    type: 'file',
-    path: path.join(baseDir, vscodePath, 'settings.json'),
-    localPath: path.join(process.cwd(), '.vscode', 'settings.json'),
-    configKey: 'mcp.servers',
-  },
-  'claude-code': {
-    type: 'file',
-    path: path.join(homeDir, '.claude.json'),
-    localPath: path.join(process.cwd(), '.mcp.json'),
-    configKey: 'mcpServers',
-  },
+function getClientPaths(): { [key: string]: ClientInstallTarget } {
+  const { baseDir, vscodePath, defaultClaudePath } = getBasePaths()
+  const homeDir = os.homedir()
+  
+  return {
+    claude: { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
+    cline: {
+      type: 'file',
+      path: path.join(
+        baseDir,
+        vscodePath,
+        'globalStorage',
+        'saoudrizwan.claude-dev',
+        'settings',
+        'cline_mcp_settings.json',
+      ),
+      configKey: 'mcpServers',
+    },
+    'roo-cline': {
+      type: 'file',
+      path: path.join(
+        baseDir,
+        vscodePath,
+        'globalStorage',
+        'rooveterinaryinc.roo-cline',
+        'settings',
+        'mcp_settings.json',
+      ),
+      configKey: 'mcpServers',
+    },
+    windsurf: {
+      type: 'file',
+      path: path.join(homeDir, '.codeium', 'windsurf', 'mcp_config.json'),
+      configKey: 'mcpServers',
+    },
+    witsy: { type: 'file', path: path.join(baseDir, 'Witsy', 'settings.json'), configKey: 'mcpServers' },
+    enconvo: {
+      type: 'file',
+      path: path.join(homeDir, '.config', 'enconvo', 'mcp_config.json'),
+      configKey: 'mcpServers',
+    },
+    cursor: {
+      type: 'file',
+      path: path.join(homeDir, '.cursor', 'mcp.json'),
+      localPath: path.join(process.cwd(), '.cursor', 'mcp.json'),
+      configKey: 'mcpServers',
+    },
+    warp: {
+      type: 'file',
+      path: 'no-local-config', // it's okay this isn't a real path, we never use it
+      configKey: 'mcpServers',
+    },
+    'gemini-cli': {
+      type: 'file',
+      path: path.join(homeDir, '.gemini', 'settings.json'),
+      localPath: path.join(process.cwd(), '.gemini', 'settings.json'),
+      configKey: 'mcpServers',
+    },
+    vscode: {
+      type: 'file',
+      path: path.join(baseDir, vscodePath, 'settings.json'),
+      localPath: path.join(process.cwd(), '.vscode', 'settings.json'),
+      configKey: 'mcp.servers',
+    },
+    'claude-code': {
+      type: 'file',
+      path: path.join(homeDir, '.claude.json'),
+      localPath: path.join(process.cwd(), '.mcp.json'),
+      configKey: 'mcpServers',
+    },
+  }
 }
 
-export const clientNames = Object.keys(clientPaths)
+export const clientNames = ['claude', 'cline', 'roo-cline', 'windsurf', 'witsy', 'enconvo', 'cursor', 'warp', 'gemini-cli', 'vscode', 'claude-code']
 
 // Helper function to get nested value from an object using dot notation
 export function getNestedValue(obj: ClientConfig, path: string): ClientConfig | undefined {
@@ -141,8 +151,10 @@ export function getConfigPath(client?: string, local?: boolean): ClientInstallTa
   const normalizedClient = client?.toLowerCase() || 'claude'
   verbose(`Getting config path for client: ${normalizedClient}${local ? ' (local)' : ''}`)
 
+  const clientPaths = getClientPaths()
   const configTarget = clientPaths[normalizedClient]
   if (!configTarget) {
+    const { defaultClaudePath } = getBasePaths()
     return {
       type: 'file',
       path: path.join(path.dirname(defaultClaudePath), '..', client || 'claude', `${normalizedClient}_config.json`),

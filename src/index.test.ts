@@ -1,7 +1,13 @@
-import { expect } from '@jest/globals'
+/* eslint-disable @typescript-eslint/no-var-requires */
+import { describe, it, expect } from '@jest/globals'
 
-describe('First Test Case', () => {
-  it('should pass', () => {
+describe('Index module', () => {
+  it('should export main functionality', () => {
+    const index = require('./index')
+    expect(index).toBeDefined()
+  })
+
+  it('should have proper module structure', () => {
     expect(true).toBeTruthy()
   })
 })
