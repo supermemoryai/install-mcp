@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/dhravya/install-mcp.git"
+    "url": "git+ssh://git@github.com/supermemoryai/install-mcp.git"
   },
   "scripts": {
     "build": "tsup-node",
