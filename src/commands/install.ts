@@ -176,7 +176,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       if (isUrl(target)) {
         // URL-based installation
-        if (['cursor', 'claude', 'vscode'].includes(argv.client)) {
+        if (['cursor', 'vscode'].includes(argv.client)) {
           setServerConfig(config, configKey, name, {
             url: target,
           })
