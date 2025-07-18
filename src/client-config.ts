@@ -50,7 +50,7 @@ function getBasePaths() {
 function getClientPaths(): { [key: string]: ClientInstallTarget } {
   const { baseDir, vscodePath, defaultClaudePath } = getBasePaths()
   const homeDir = os.homedir()
-  
+
   return {
     claude: { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
     cline: {
@@ -120,7 +120,19 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
   }
 }
 
-export const clientNames = ['claude', 'cline', 'roo-cline', 'windsurf', 'witsy', 'enconvo', 'cursor', 'warp', 'gemini-cli', 'vscode', 'claude-code']
+export const clientNames = [
+  'claude',
+  'cline',
+  'roo-cline',
+  'windsurf',
+  'witsy',
+  'enconvo',
+  'cursor',
+  'warp',
+  'gemini-cli',
+  'vscode',
+  'claude-code',
+]
 
 // Helper function to get nested value from an object using dot notation
 export function getNestedValue(obj: ClientConfig, path: string): ClientConfig | undefined {
