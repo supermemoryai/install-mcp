@@ -37,6 +37,7 @@ export interface InstallArgv {
   client: string
   local?: boolean
   yes?: boolean
+  header?: string[]
 }
 
 export const command = '$0 [target]'
@@ -67,6 +68,11 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       alias: 'y',
       description: 'Skip confirmation prompt',
       default: false,
+    })
+    .option('header', {
+      type: 'array',
+      description: 'Headers to pass to the server (format: "Header: value")',
+      default: [],
     })
 }
 
@@ -117,6 +123,21 @@ function buildCommand(input: string): string {
   }
 }
 
+function parseHeaders(headers: string[]): Record<string, string> {
+  const parsedHeaders: Record<string, string> = {}
+  for (const header of headers) {
+    const colonIndex = header.indexOf(':')
+    if (colonIndex !== -1) {
+      const name = header.substring(0, colonIndex).trim()
+      const value = header.substring(colonIndex + 1).trim()
+      if (name && value) {
+        parsedHeaders[name] = value
+      }
+    }
+  }
+  return parsedHeaders
+}
+
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   if (!argv.client || !clientNames.includes(argv.client)) {
     logger.error(`Invalid client: ${argv.client}. Available clients: ${clientNames.join(', ')}`)
@@ -137,12 +158,27 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     logger.log('')
     logger.info('Warp requires a manual installation through their UI.')
     logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
+
+    // Build args array for Warp
+    let warpArgs: string[]
+    if (isUrl(target)) {
+      warpArgs = ['-y', 'supergateway', '--sse', target]
+      // Add headers as arguments for supergateway
+      if (argv.header && argv.header.length > 0) {
+        for (const header of argv.header) {
+          warpArgs.push('--header', header)
+        }
+      }
+    } else {
+      warpArgs = command.split(' ').slice(1)
+    }
+
     logger.log(
       JSON.stringify(
         {
           [name]: {
             command: isUrl(target) ? 'npx' : command.split(' ')[0],
-            args: isUrl(target) ? ['-y', 'supergateway', '--sse', target] : command.split(' ').slice(1),
+            args: warpArgs,
             env: {},
             working_directory: null,
             start_on_launch: true,
@@ -177,13 +213,28 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
       if (isUrl(target)) {
         // URL-based installation
         if (['cursor', 'vscode'].includes(argv.client)) {
-          setServerConfig(config, configKey, name, {
+          const serverConfig: ClientConfig = {
             url: target,
-          })
+          }
+          // Add headers if provided
+          if (argv.header && argv.header.length > 0) {
+            const parsedHeaders = parseHeaders(argv.header)
+            if (Object.keys(parsedHeaders).length > 0) {
+              serverConfig.headers = parsedHeaders
+            }
+          }
+          setServerConfig(config, configKey, name, serverConfig)
         } else {
+          const args = ['-y', 'supergateway', '--sse', target]
+          // Add headers as arguments for supergateway
+          if (argv.header && argv.header.length > 0) {
+            for (const header of argv.header) {
+              args.push('--header', header)
+            }
+          }
           setServerConfig(config, configKey, name, {
             command: 'npx',
-            args: ['-y', 'supergateway', '--sse', target],
+            args: args,
           })
         }
       } else {

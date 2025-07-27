@@ -39,6 +39,20 @@ The tool automatically:
 - Infers server names from package names or URLs (e.g., `mcp.example.com` → `mcp-example-com`)
 - Handles URL-based servers with supergateway SSE support
 
+### Headers Support
+
+You can pass headers for authentication or other purposes using the `--header` flag:
+
+```bash
+# Single header
+npx install-mcp https://api.example.com/mcp --client claude --header "Authorization: Bearer token123"
+
+# Multiple headers
+npx install-mcp https://api.example.com/mcp --client claude \
+  --header "Authorization: Bearer token123" \
+  --header "X-API-Key: secret-key"
+```
+
 where `<client>` is one of the following:
 
 - `claude`
