@@ -106,6 +106,35 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock the transport confirmation prompts (defaults to http)
+      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should install URL with SSE transport when specified', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        transport: 'sse',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
       await handler(argv)
 
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
@@ -120,6 +149,122 @@ describe('install command', () => {
         'cline',
         undefined,
       )
+    })
+
+    it('should install URL with HTTP transport when specified', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        transport: 'http',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should prompt for transport when URL provided without transport flag', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock the transport confirmation prompts
+      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+
+      await handler(argv)
+
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server support the streamable HTTP transport method?', {
+        type: 'confirm',
+      })
+    })
+
+    it('should fall back to SSE when HTTP is not supported', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock the transport confirmation prompts
+      mockLogger.prompt
+        .mockResolvedValueOnce(false) // doesn't support streamable HTTP
+        .mockResolvedValueOnce(true) // uses legacy SSE
+
+      await handler(argv)
+
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does your server use the legacy SSE transport method?', {
+        type: 'confirm',
+      })
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should error when neither transport is supported', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock the transport confirmation prompts
+      mockLogger.prompt
+        .mockResolvedValueOnce(false) // doesn't support streamable HTTP
+        .mockResolvedValueOnce(false) // doesn't use legacy SSE
+
+      await handler(argv)
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Server must support either streamable HTTP or legacy SSE transport method.',
+      )
+      expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
+    })
+
+    it('should not prompt for transport for non-URL targets', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'claude',
+        target: 'test-package',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      // Should not have prompted for transport
+      expect(mockLogger.prompt).not.toHaveBeenCalledWith(expect.stringContaining('transport'), expect.any(Object))
     })
 
     it('should install URL directly for cursor/claude/vscode clients', async () => {
@@ -264,10 +409,45 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock the transport confirmation prompts (defaults to http)
+      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+
       await handler(argv)
 
       expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('supergateway'))
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--streamableHttp'))
+    })
+
+    it('should handle warp client with SSE transport', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'warp',
+        target: 'https://example.com/server',
+        transport: 'sse',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--sse'))
+    })
+
+    it('should handle warp client with HTTP transport', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'warp',
+        target: 'https://example.com/server',
+        transport: 'http',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--streamableHttp'))
     })
 
     it('should prompt for confirmation when yes flag is not set', async () => {
@@ -336,6 +516,69 @@ describe('install command', () => {
       await handler(argv)
 
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(expect.any(Object), 'vscode', undefined)
+    })
+
+    it('should handle headers with URL installation', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cursor',
+        target: 'https://example.com/server',
+        header: ['Authorization: Bearer token123', 'X-Custom-Header: value'],
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              url: 'https://example.com/server',
+              headers: {
+                Authorization: 'Bearer token123',
+                'X-Custom-Header': 'value',
+              },
+            },
+          },
+        }),
+        'cursor',
+        undefined,
+      )
+    })
+
+    it('should handle headers with supergateway and different transports', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        header: ['Authorization: Bearer token123'],
+        transport: 'http',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: [
+                '-y',
+                'supergateway',
+                '--streamableHttp',
+                'https://example.com/server',
+                '--header',
+                'Authorization: Bearer token123',
+              ],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
     })
   })
 

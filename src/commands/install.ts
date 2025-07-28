@@ -38,6 +38,7 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   header?: string[]
+  transport?: 'sse' | 'http'
 }
 
 export const command = '$0 [target]'
@@ -74,6 +75,12 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
+    .option('transport', {
+      type: 'string',
+      alias: 't',
+      description: 'Transport protocol for URL servers (sse or http)',
+      choices: ['sse', 'http'],
+    } as const)
 }
 
 function isUrl(input: string): boolean {
@@ -151,6 +158,32 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     })) as string
   }
 
+  // Prompt for transport if target is a URL and transport not specified
+  let transport = argv.transport
+  if (isUrl(target) && !transport) {
+    // Ask about streamable HTTP first (default yes)
+    const supportsStreamableHttp = await logger.prompt(
+      'Does this server support the streamable HTTP transport method?',
+      { type: 'confirm' },
+    )
+
+    if (supportsStreamableHttp) {
+      transport = 'http'
+    } else {
+      // Ask about legacy SSE (default no, but if they said no to HTTP, we need to confirm SSE)
+      const usesLegacySSE = await logger.prompt('Does your server use the legacy SSE transport method?', {
+        type: 'confirm',
+      })
+
+      if (usesLegacySSE) {
+        transport = 'sse'
+      } else {
+        logger.error('Server must support either streamable HTTP or legacy SSE transport method.')
+        return
+      }
+    }
+  }
+
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
 
@@ -162,7 +195,8 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     // Build args array for Warp
     let warpArgs: string[]
     if (isUrl(target)) {
-      warpArgs = ['-y', 'supergateway', '--sse', target]
+      const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
+      warpArgs = ['-y', 'supergateway', transportFlag, target]
       // Add headers as arguments for supergateway
       if (argv.header && argv.header.length > 0) {
         for (const header of argv.header) {
@@ -225,7 +259,8 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           }
           setServerConfig(config, configKey, name, serverConfig)
         } else {
-          const args = ['-y', 'supergateway', '--sse', target]
+          const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
+          const args = ['-y', 'supergateway', transportFlag, target]
           // Add headers as arguments for supergateway
           if (argv.header && argv.header.length > 0) {
             for (const header of argv.header) {
