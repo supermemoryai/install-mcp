@@ -10,6 +10,7 @@ import {
   setNestedValue,
   type ClientConfig,
 } from '../client-config'
+import { detectMcpTransport } from '../detect-transport'
 
 // Helper to set a server config in a nested structure
 function setServerConfig(
@@ -38,6 +39,7 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   header?: string[]
+  transport?: 'sse' | 'http'
 }
 
 export const command = '$0 [target]'
@@ -74,6 +76,12 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
+    .option('transport', {
+      type: 'string',
+      alias: 't',
+      description: 'Transport protocol for URL servers (sse or http)',
+      choices: ['sse', 'http'],
+    } as const)
 }
 
 function isUrl(input: string): boolean {
@@ -151,6 +159,61 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     })) as string
   }
 
+  // Prompt for transport if target is a URL and transport not specified
+  let transport = argv.transport
+  if (isUrl(target) && !transport) {
+    // Try to auto-detect the transport type
+    logger.info('Detecting transport type... this may take a few seconds.')
+
+    const detectedTransport = await detectMcpTransport(target, {
+      timeoutMs: 5000,
+      headers: argv.header ? parseHeaders(argv.header) : undefined,
+    })
+
+    if (detectedTransport === 'http' || detectedTransport === 'sse') {
+      // We detected a transport type, ask for confirmation
+      const transportDisplay = detectedTransport === 'http' ? 'streamable HTTP' : 'SSE'
+      const confirmed = await logger.prompt(
+        `We've detected that this server uses the ${transportDisplay} transport method. Is this correct?`,
+        { type: 'confirm' },
+      )
+
+      if (confirmed) {
+        transport = detectedTransport
+      } else {
+        // User said no, use the other transport method
+        transport = detectedTransport === 'http' ? 'sse' : 'http'
+        const otherTransportDisplay = transport === 'http' ? 'streamable HTTP' : 'SSE'
+        logger.info(`Installing as ${otherTransportDisplay} transport method.`)
+      }
+    } else {
+      // Detection failed, fall back to manual questions
+      logger.info('Could not auto-detect transport type, please answer the following questions:')
+
+      // Ask about streamable HTTP first (default yes)
+      const supportsStreamableHttp = await logger.prompt(
+        'Does this server support the streamable HTTP transport method?',
+        { type: 'confirm' },
+      )
+
+      if (supportsStreamableHttp) {
+        transport = 'http'
+      } else {
+        // Ask about legacy SSE (default no, but if they said no to HTTP, we need to confirm SSE)
+        const usesLegacySSE = await logger.prompt('Does your server use the legacy SSE transport method?', {
+          type: 'confirm',
+        })
+
+        if (usesLegacySSE) {
+          transport = 'sse'
+        } else {
+          logger.error('Remote servers must support either streamable HTTP or legacy SSE transport method.')
+          return
+        }
+      }
+    }
+  }
+
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
 
@@ -162,7 +225,8 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     // Build args array for Warp
     let warpArgs: string[]
     if (isUrl(target)) {
-      warpArgs = ['-y', 'supergateway', '--sse', target]
+      const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
+      warpArgs = ['-y', 'supergateway', transportFlag, target]
       // Add headers as arguments for supergateway
       if (argv.header && argv.header.length > 0) {
         for (const header of argv.header) {
@@ -225,7 +289,8 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           }
           setServerConfig(config, configKey, name, serverConfig)
         } else {
-          const args = ['-y', 'supergateway', '--sse', target]
+          const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
+          const args = ['-y', 'supergateway', transportFlag, target]
           // Add headers as arguments for supergateway
           if (argv.header && argv.header.length > 0) {
             for (const header of argv.header) {

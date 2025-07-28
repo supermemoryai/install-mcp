@@ -53,6 +53,50 @@ npx install-mcp https://api.example.com/mcp --client claude \
   --header "X-API-Key: secret-key"
 ```
 
+### Transport Methods for Remote Servers
+
+When installing remote servers (URLs), the CLI needs to know which transport method the server uses. There are two transport methods:
+
+- **Streamable HTTP** (modern, recommended)
+- **SSE** (legacy)
+
+The CLI handles this in several ways:
+
+#### Automatic Detection
+
+By default, the CLI will automatically detect the transport method:
+
+```bash
+npx install-mcp https://api.example.com/mcp --client claude
+# Output: Detecting transport type... this may take a few seconds.
+# Output: We've detected that this server uses the streamable HTTP transport method. Is this correct? (Y/n)
+```
+
+If the detection succeeds, it will ask you to confirm. If you answer "no", it will use the other transport method.
+
+#### Manual Specification
+
+You can skip detection by specifying the transport method directly:
+
+```bash
+# For streamable HTTP servers
+npx install-mcp https://api.example.com/mcp --client claude --transport http
+
+# For legacy SSE servers
+npx install-mcp https://api.example.com/mcp --client claude --transport sse
+```
+
+#### Fallback to Manual Questions
+
+If auto-detection fails, the CLI will ask you directly:
+
+```
+Could not auto-detect transport type, please answer the following questions:
+Does this server support the streamable HTTP transport method? (Y/n)
+```
+
+Note: This only applies to URL-based installations. Package names and custom commands don't require transport selection.
+
 where `<client>` is one of the following:
 
 - `claude`
