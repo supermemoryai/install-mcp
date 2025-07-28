@@ -3,13 +3,16 @@ import type { ArgumentsCamelCase } from 'yargs'
 import { handler, InstallArgv } from './install'
 import * as clientConfig from '../client-config'
 import { logger } from '../logger'
+import * as detectTransport from '../detect-transport'
 
 // Mock dependencies
 jest.mock('../client-config')
 jest.mock('../logger')
+jest.mock('../detect-transport')
 
 const mockClientConfig = clientConfig as jest.Mocked<typeof clientConfig>
 const mockLogger = logger as jest.Mocked<typeof logger>
+const mockDetectTransport = detectTransport as jest.Mocked<typeof detectTransport>
 
 describe('install command', () => {
   beforeEach(() => {
@@ -38,6 +41,7 @@ describe('install command', () => {
       configKey: 'mcpServers',
     })
     mockLogger.prompt.mockResolvedValue('test-package')
+    mockDetectTransport.detectMcpTransport.mockResolvedValue('unknown')
   })
 
   afterEach(() => {
@@ -106,11 +110,21 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock the transport confirmation prompts (defaults to http)
-      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+      // Mock auto-detection returns http and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
 
       await handler(argv)
 
+      expect(mockDetectTransport.detectMcpTransport).toHaveBeenCalledWith('https://example.com/server', {
+        timeoutMs: 5000,
+        headers: undefined,
+      })
+      expect(mockLogger.info).toHaveBeenCalledWith('Detecting transport type... this may take a few seconds.')
+      expect(mockLogger.prompt).toHaveBeenCalledWith(
+        "We've detected that this server uses the streamable HTTP transport method. Is this correct?",
+        { type: 'confirm' },
+      )
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           mcpServers: {
@@ -186,14 +200,16 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock the transport confirmation prompts
-      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+      // Mock auto-detection returns http and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
 
       await handler(argv)
 
-      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server support the streamable HTTP transport method?', {
-        type: 'confirm',
-      })
+      expect(mockLogger.prompt).toHaveBeenCalledWith(
+        "We've detected that this server uses the streamable HTTP transport method. Is this correct?",
+        { type: 'confirm' },
+      )
     })
 
     it('should fall back to SSE when HTTP is not supported', async () => {
@@ -205,7 +221,8 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock the transport confirmation prompts
+      // Mock auto-detection returns unknown, then manual prompts
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
       mockLogger.prompt
         .mockResolvedValueOnce(false) // doesn't support streamable HTTP
         .mockResolvedValueOnce(true) // uses legacy SSE
@@ -239,7 +256,8 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock the transport confirmation prompts
+      // Mock auto-detection returns unknown, then manual prompts fail
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
       mockLogger.prompt
         .mockResolvedValueOnce(false) // doesn't support streamable HTTP
         .mockResolvedValueOnce(false) // doesn't use legacy SSE
@@ -247,7 +265,7 @@ describe('install command', () => {
       await handler(argv)
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Server must support either streamable HTTP or legacy SSE transport method.',
+        'Remote servers must support either streamable HTTP or legacy SSE transport method.',
       )
       expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
     })
@@ -275,6 +293,10 @@ describe('install command', () => {
         _: [],
         $0: 'install-mcp',
       }
+
+      // Mock auto-detection returns http and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
 
       await handler(argv)
 
@@ -409,8 +431,9 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock the transport confirmation prompts (defaults to http)
-      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+      // Mock auto-detection returns http and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
 
       await handler(argv)
 
@@ -579,6 +602,128 @@ describe('install command', () => {
         'cline',
         undefined,
       )
+    })
+
+    it('should auto-detect SSE transport and install with confirmation', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock auto-detection returns sse and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('sse')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
+
+      await handler(argv)
+
+      expect(mockLogger.prompt).toHaveBeenCalledWith(
+        "We've detected that this server uses the SSE transport method. Is this correct?",
+        { type: 'confirm' },
+      )
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should use opposite transport when user rejects auto-detection', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock auto-detection returns http but user rejects it
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(false) // rejects detected transport
+
+      await handler(argv)
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Installing as SSE transport method.')
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should fall back to manual questions when auto-detection returns unknown', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock auto-detection returns unknown
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
+      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
+
+      await handler(argv)
+
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Could not auto-detect transport type, please answer the following questions:',
+      )
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server support the streamable HTTP transport method?', {
+        type: 'confirm',
+      })
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should pass headers to detectMcpTransport when provided', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        header: ['Authorization: Bearer token123'],
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock auto-detection returns http and user confirms
+      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
+      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
+
+      await handler(argv)
+
+      expect(mockDetectTransport.detectMcpTransport).toHaveBeenCalledWith('https://example.com/server', {
+        timeoutMs: 5000,
+        headers: {
+          Authorization: 'Bearer token123',
+        },
+      })
     })
   })
 
