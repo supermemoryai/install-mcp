@@ -1,6 +1,6 @@
 {
   "name": "install-mcp",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "A CLI tool to install and manage MCP servers.",
   "bin": {
     "install-mcp": "./bin/run"
