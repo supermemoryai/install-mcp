@@ -39,6 +39,7 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   header?: string[]
+  oauth?: 'yes' | 'no'
 }
 
 export const command = '$0 [target]'
@@ -75,6 +76,11 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
+    .option('oauth', {
+      type: 'string',
+      description: 'Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.',
+      choices: ['yes', 'no'],
+    } as const)
 }
 
 function isUrl(input: string): boolean {
@@ -212,11 +218,19 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   if (ready) {
     if (isUrl(target)) {
-      // Ask if the server uses OAuth
-      const usesOAuth = await logger.prompt('Does this server use OAuth authentication?', {
-        type: 'confirm',
-      })
-      
+      // Determine if we should use OAuth
+      let usesOAuth: boolean
+      if (argv.oauth === 'yes') {
+        usesOAuth = true
+      } else if (argv.oauth === 'no') {
+        usesOAuth = false
+      } else {
+        // Ask if the server uses OAuth
+        usesOAuth = await logger.prompt('Does this server use OAuth authentication?', {
+          type: 'confirm',
+        })
+      }
+
       if (usesOAuth) {
         try {
           await runAuthentication(target)

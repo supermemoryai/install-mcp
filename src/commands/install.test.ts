@@ -214,6 +214,60 @@ describe('install command', () => {
       )
     })
 
+    it('should skip OAuth prompt when --oauth=yes flag is used', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        oauth: 'yes',
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      // Should not prompt for OAuth
+      expect(mockLogger.prompt).not.toHaveBeenCalledWith('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
+      // Should run authentication directly
+      expect(mockLogger.info).toHaveBeenCalledWith('Running authentication for https://example.com/server')
+      expect(mockSpawn).toHaveBeenCalled()
+    })
+
+    it('should skip OAuth prompt and authentication when --oauth=no flag is used', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        oauth: 'no',
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      // Should not prompt for OAuth
+      expect(mockLogger.prompt).not.toHaveBeenCalledWith('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
+      // Should not run authentication
+      expect(mockSpawn).not.toHaveBeenCalled()
+      expect(mockLogger.info).not.toHaveBeenCalledWith('Running authentication for https://example.com/server')
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote@latest', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
     it('should not run authentication for non-URL targets', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',

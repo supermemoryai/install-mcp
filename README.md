@@ -62,6 +62,16 @@ npx install-mcp https://api.example.com/mcp --client claude
 # Output: Does this server use OAuth authentication? (Y/n)
 ```
 
+You can bypass this prompt using the `--oauth` flag:
+
+```bash
+# Automatically run OAuth authentication
+npx install-mcp https://api.example.com/mcp --client claude --oauth yes
+
+# Skip OAuth authentication entirely
+npx install-mcp https://api.example.com/mcp --client claude --oauth no
+```
+
 If you answer yes, the authentication flow:
 
 - Runs automatically before installation
