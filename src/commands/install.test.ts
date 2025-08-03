@@ -123,8 +123,14 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
+
       await handler(argv)
 
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
       expect(mockLogger.info).toHaveBeenCalledWith('Running authentication for https://example.com/server')
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
@@ -154,6 +160,9 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
+
       // Mock authentication failure
       const mockChildProcess = new EventEmitter() as unknown as ChildProcess
       // Create a properly typed mock for the 'on' method
@@ -170,6 +179,39 @@ describe('install command', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith('Authentication failed. Use the client to authenticate.')
       expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
+    })
+
+    it('should skip authentication when server does not use OAuth', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock OAuth prompt to return false
+      mockLogger.prompt.mockResolvedValueOnce(false)
+
+      await handler(argv)
+
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
+      expect(mockSpawn).not.toHaveBeenCalled()
+      expect(mockLogger.info).not.toHaveBeenCalledWith('Running authentication for https://example.com/server')
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote@latest', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
     })
 
     it('should not run authentication for non-URL targets', async () => {
@@ -196,8 +238,14 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
+
       await handler(argv)
 
+      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
       expect(mockLogger.info).toHaveBeenCalledWith('Running authentication for https://example.com/server')
       expect(mockSpawn).toHaveBeenCalledWith(
         'npx',
@@ -441,6 +489,9 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
+
       await handler(argv)
 
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
@@ -534,6 +585,9 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
+
       await handler(argv)
 
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
@@ -555,6 +609,9 @@ describe('install command', () => {
         _: [],
         $0: 'install-mcp',
       }
+
+      // Mock OAuth prompt to return true
+      mockLogger.prompt.mockResolvedValueOnce(true)
 
       await handler(argv)
 

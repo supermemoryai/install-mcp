@@ -212,11 +212,18 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   if (ready) {
     if (isUrl(target)) {
-      try {
-        await runAuthentication(target)
-      } catch {
-        logger.error('Authentication failed. Use the client to authenticate.')
-        return
+      // Ask if the server uses OAuth
+      const usesOAuth = await logger.prompt('Does this server use OAuth authentication?', {
+        type: 'confirm',
+      })
+      
+      if (usesOAuth) {
+        try {
+          await runAuthentication(target)
+        } catch {
+          logger.error('Authentication failed. Use the client to authenticate.')
+          return
+        }
       }
     }
 
