@@ -10,7 +10,7 @@ import {
   setNestedValue,
   type ClientConfig,
 } from '../client-config'
-import { detectMcpTransport } from '../detect-transport'
+import { spawn } from 'child_process'
 
 // Helper to set a server config in a nested structure
 function setServerConfig(
@@ -39,7 +39,7 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   header?: string[]
-  transport?: 'sse' | 'http'
+  oauth?: 'yes' | 'no'
 }
 
 export const command = '$0 [target]'
@@ -76,11 +76,10 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
-    .option('transport', {
+    .option('oauth', {
       type: 'string',
-      alias: 't',
-      description: 'Transport protocol for URL servers (sse or http)',
-      choices: ['sse', 'http'],
+      description: 'Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.',
+      choices: ['yes', 'no'],
     } as const)
 }
 
@@ -131,19 +130,24 @@ function buildCommand(input: string): string {
   }
 }
 
-function parseHeaders(headers: string[]): Record<string, string> {
-  const parsedHeaders: Record<string, string> = {}
-  for (const header of headers) {
-    const colonIndex = header.indexOf(':')
-    if (colonIndex !== -1) {
-      const name = header.substring(0, colonIndex).trim()
-      const value = header.substring(colonIndex + 1).trim()
-      if (name && value) {
-        parsedHeaders[name] = value
+// Run the authentication flow for remote servers before installation.
+async function runAuthentication(url: string): Promise<void> {
+  logger.info(`Running authentication for ${url}`)
+  return new Promise((resolve, reject) => {
+    const child = spawn('npx', ['-y', '-p', 'mcp-remote@latest', 'mcp-remote-client', url], {
+      stdio: ['ignore', 'ignore', 'ignore'], // Hide all output
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve()
+      } else {
+        reject(new Error(`Authentication exited with code ${code}`))
       }
-    }
-  }
-  return parsedHeaders
+    })
+
+    child.on('error', reject)
+  })
 }
 
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
@@ -159,61 +163,6 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     })) as string
   }
 
-  // Prompt for transport if target is a URL and transport not specified
-  let transport = argv.transport
-  if (isUrl(target) && !transport) {
-    // Try to auto-detect the transport type
-    logger.info('Detecting transport type... this may take a few seconds.')
-
-    const detectedTransport = await detectMcpTransport(target, {
-      timeoutMs: 5000,
-      headers: argv.header ? parseHeaders(argv.header) : undefined,
-    })
-
-    if (detectedTransport === 'http' || detectedTransport === 'sse') {
-      // We detected a transport type, ask for confirmation
-      const transportDisplay = detectedTransport === 'http' ? 'streamable HTTP' : 'SSE'
-      const confirmed = await logger.prompt(
-        `We've detected that this server uses the ${transportDisplay} transport method. Is this correct?`,
-        { type: 'confirm' },
-      )
-
-      if (confirmed) {
-        transport = detectedTransport
-      } else {
-        // User said no, use the other transport method
-        transport = detectedTransport === 'http' ? 'sse' : 'http'
-        const otherTransportDisplay = transport === 'http' ? 'streamable HTTP' : 'SSE'
-        logger.info(`Installing as ${otherTransportDisplay} transport method.`)
-      }
-    } else {
-      // Detection failed, fall back to manual questions
-      logger.info('Could not auto-detect transport type, please answer the following questions:')
-
-      // Ask about streamable HTTP first (default yes)
-      const supportsStreamableHttp = await logger.prompt(
-        'Does this server support the streamable HTTP transport method?',
-        { type: 'confirm' },
-      )
-
-      if (supportsStreamableHttp) {
-        transport = 'http'
-      } else {
-        // Ask about legacy SSE (default no, but if they said no to HTTP, we need to confirm SSE)
-        const usesLegacySSE = await logger.prompt('Does your server use the legacy SSE transport method?', {
-          type: 'confirm',
-        })
-
-        if (usesLegacySSE) {
-          transport = 'sse'
-        } else {
-          logger.error('Remote servers must support either streamable HTTP or legacy SSE transport method.')
-          return
-        }
-      }
-    }
-  }
-
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
 
@@ -225,8 +174,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     // Build args array for Warp
     let warpArgs: string[]
     if (isUrl(target)) {
-      const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
-      warpArgs = ['-y', 'supergateway', transportFlag, target]
+      warpArgs = ['-y', 'mcp-remote@latest', target]
       // Add headers as arguments for supergateway
       if (argv.header && argv.header.length > 0) {
         for (const header of argv.header) {
@@ -269,6 +217,30 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   }
 
   if (ready) {
+    if (isUrl(target)) {
+      // Determine if we should use OAuth
+      let usesOAuth: boolean
+      if (argv.oauth === 'yes') {
+        usesOAuth = true
+      } else if (argv.oauth === 'no') {
+        usesOAuth = false
+      } else {
+        // Ask if the server uses OAuth
+        usesOAuth = await logger.prompt('Does this server use OAuth authentication?', {
+          type: 'confirm',
+        })
+      }
+
+      if (usesOAuth) {
+        try {
+          await runAuthentication(target)
+        } catch {
+          logger.error('Authentication failed. Use the client to authenticate.')
+          return
+        }
+      }
+    }
+
     try {
       const config = readConfig(argv.client, argv.local)
       const configPath = getConfigPath(argv.client, argv.local)
@@ -276,32 +248,18 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       if (isUrl(target)) {
         // URL-based installation
-        if (['cursor', 'vscode'].includes(argv.client)) {
-          const serverConfig: ClientConfig = {
-            url: target,
+
+        const args = ['-y', 'mcp-remote@latest', target]
+        // Add headers as arguments for supergateway
+        if (argv.header && argv.header.length > 0) {
+          for (const header of argv.header) {
+            args.push('--header', header)
           }
-          // Add headers if provided
-          if (argv.header && argv.header.length > 0) {
-            const parsedHeaders = parseHeaders(argv.header)
-            if (Object.keys(parsedHeaders).length > 0) {
-              serverConfig.headers = parsedHeaders
-            }
-          }
-          setServerConfig(config, configKey, name, serverConfig)
-        } else {
-          const transportFlag = transport === 'http' ? '--streamableHttp' : '--sse'
-          const args = ['-y', 'supergateway', transportFlag, target]
-          // Add headers as arguments for supergateway
-          if (argv.header && argv.header.length > 0) {
-            for (const header of argv.header) {
-              args.push('--header', header)
-            }
-          }
-          setServerConfig(config, configKey, name, {
-            command: 'npx',
-            args: args,
-          })
         }
+        setServerConfig(config, configKey, name, {
+          command: 'npx',
+          args: args,
+        })
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
