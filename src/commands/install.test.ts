@@ -3,16 +3,18 @@ import type { ArgumentsCamelCase } from 'yargs'
 import { handler, InstallArgv } from './install'
 import * as clientConfig from '../client-config'
 import { logger } from '../logger'
-import * as detectTransport from '../detect-transport'
+import { spawn } from 'child_process'
+import type { ChildProcess } from 'child_process'
+import { EventEmitter } from 'events'
 
 // Mock dependencies
 jest.mock('../client-config')
 jest.mock('../logger')
-jest.mock('../detect-transport')
+jest.mock('child_process')
 
 const mockClientConfig = clientConfig as jest.Mocked<typeof clientConfig>
 const mockLogger = logger as jest.Mocked<typeof logger>
-const mockDetectTransport = detectTransport as jest.Mocked<typeof detectTransport>
+const mockSpawn = spawn as jest.MockedFunction<typeof spawn>
 
 describe('install command', () => {
   beforeEach(() => {
@@ -41,7 +43,18 @@ describe('install command', () => {
       configKey: 'mcpServers',
     })
     mockLogger.prompt.mockResolvedValue('test-package')
-    mockDetectTransport.detectMcpTransport.mockResolvedValue('unknown')
+
+    // Mock successful authentication by default
+    const mockChildProcess = new EventEmitter() as unknown as ChildProcess
+    // Create a properly typed mock for the 'on' method
+    const mockOn = jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+      if (event === 'close') {
+        setTimeout(() => handler(0), 0)
+      }
+      return mockChildProcess
+    })
+    mockChildProcess.on = mockOn as ChildProcess['on']
+    mockSpawn.mockReturnValue(mockChildProcess)
   })
 
   afterEach(() => {
@@ -101,7 +114,7 @@ describe('install command', () => {
       )
     })
 
-    it('should install URL with supergateway for non-direct-URL clients', async () => {
+    it('should install URL with mcp-remote for non-direct-URL clients', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'cline',
         target: 'https://example.com/server',
@@ -110,167 +123,56 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock auto-detection returns http and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
-
       await handler(argv)
 
-      expect(mockDetectTransport.detectMcpTransport).toHaveBeenCalledWith('https://example.com/server', {
-        timeoutMs: 5000,
-        headers: undefined,
+      expect(mockLogger.info).toHaveBeenCalledWith('Running authentication for https://example.com/server')
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['-y', '-p', 'mcp-remote@latest', 'mcp-remote-client', 'https://example.com/server'],
+        { stdio: ['ignore', 'ignore', 'ignore'] },
+      )
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote@latest', 'https://example.com/server'],
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should handle authentication failure for URL installation', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock authentication failure
+      const mockChildProcess = new EventEmitter() as unknown as ChildProcess
+      // Create a properly typed mock for the 'on' method
+      const mockOn = jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        if (event === 'close') {
+          setTimeout(() => handler(1), 0) // Exit code 1 for failure
+        }
+        return mockChildProcess
       })
-      expect(mockLogger.info).toHaveBeenCalledWith('Detecting transport type... this may take a few seconds.')
-      expect(mockLogger.prompt).toHaveBeenCalledWith(
-        "We've detected that this server uses the streamable HTTP transport method. Is this correct?",
-        { type: 'confirm' },
-      )
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should install URL with SSE transport when specified', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        transport: 'sse',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
+      mockChildProcess.on = mockOn as ChildProcess['on']
+      mockSpawn.mockReturnValueOnce(mockChildProcess)
 
       await handler(argv)
 
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should install URL with HTTP transport when specified', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        transport: 'http',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should prompt for transport when URL provided without transport flag', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns http and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
-
-      await handler(argv)
-
-      expect(mockLogger.prompt).toHaveBeenCalledWith(
-        "We've detected that this server uses the streamable HTTP transport method. Is this correct?",
-        { type: 'confirm' },
-      )
-    })
-
-    it('should fall back to SSE when HTTP is not supported', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns unknown, then manual prompts
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
-      mockLogger.prompt
-        .mockResolvedValueOnce(false) // doesn't support streamable HTTP
-        .mockResolvedValueOnce(true) // uses legacy SSE
-
-      await handler(argv)
-
-      expect(mockLogger.prompt).toHaveBeenCalledWith('Does your server use the legacy SSE transport method?', {
-        type: 'confirm',
-      })
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should error when neither transport is supported', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns unknown, then manual prompts fail
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
-      mockLogger.prompt
-        .mockResolvedValueOnce(false) // doesn't support streamable HTTP
-        .mockResolvedValueOnce(false) // doesn't use legacy SSE
-
-      await handler(argv)
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Remote servers must support either streamable HTTP or legacy SSE transport method.',
-      )
+      expect(mockLogger.error).toHaveBeenCalledWith('Authentication failed. Use the client to authenticate.')
       expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
     })
 
-    it('should not prompt for transport for non-URL targets', async () => {
+    it('should not run authentication for non-URL targets', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
         target: 'test-package',
@@ -281,11 +183,11 @@ describe('install command', () => {
 
       await handler(argv)
 
-      // Should not have prompted for transport
-      expect(mockLogger.prompt).not.toHaveBeenCalledWith(expect.stringContaining('transport'), expect.any(Object))
+      // Should not have run authentication
+      expect(mockSpawn).not.toHaveBeenCalled()
     })
 
-    it('should install URL directly for cursor/claude/vscode clients', async () => {
+    it('should install URL with mcp-remote for cursor/claude/vscode clients', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'cursor',
         target: 'https://example.com/server',
@@ -294,17 +196,20 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock auto-detection returns http and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
-
       await handler(argv)
 
+      expect(mockLogger.info).toHaveBeenCalledWith('Running authentication for https://example.com/server')
+      expect(mockSpawn).toHaveBeenCalledWith(
+        'npx',
+        ['-y', '-p', 'mcp-remote@latest', 'mcp-remote-client', 'https://example.com/server'],
+        { stdio: ['ignore', 'ignore', 'ignore'] },
+      )
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           mcpServers: {
             'example-com': {
-              url: 'https://example.com/server',
+              command: 'npx',
+              args: ['-y', 'mcp-remote@latest', 'https://example.com/server'],
             },
           },
         }),
@@ -338,32 +243,7 @@ describe('install command', () => {
       )
     })
 
-    it('should handle npx command', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'claude',
-        target: 'npx -y @modelcontextprotocol/server-filesystem',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            '@modelcontextprotocol/server-filesystem': {
-              command: 'npx',
-              args: ['-y', '@modelcontextprotocol/server-filesystem'],
-            },
-          },
-        }),
-        'claude',
-        undefined,
-      )
-    })
-
-    it('should use custom name if provided', async () => {
+    it('should install with custom name', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
         target: 'test-package',
@@ -389,91 +269,7 @@ describe('install command', () => {
       )
     })
 
-    it('should install locally when local flag is set', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'claude',
-        target: 'test-package',
-        local: true,
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(expect.anything(), 'claude', true)
-    })
-
-    it('should handle warp client with manual instructions', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'warp',
-        target: 'test-package',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Warp requires a manual installation'))
-      expect(mockLogger.box).toHaveBeenCalledWith(
-        expect.stringContaining("Read Warp's documentation"),
-        expect.any(String),
-      )
-    })
-
-    it('should handle warp client with URL', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'warp',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns http and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
-
-      await handler(argv)
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--streamableHttp'))
-    })
-
-    it('should handle warp client with SSE transport', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'warp',
-        target: 'https://example.com/server',
-        transport: 'sse',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--sse'))
-    })
-
-    it('should handle warp client with HTTP transport', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'warp',
-        target: 'https://example.com/server',
-        transport: 'http',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"command": "npx"'))
-      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('--streamableHttp'))
-    })
-
-    it('should prompt for confirmation when yes flag is not set', async () => {
+    it('should prompt for confirmation when not using --yes', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
         target: 'test-package',
@@ -485,10 +281,13 @@ describe('install command', () => {
 
       await handler(argv)
 
-      expect(mockLogger.prompt).toHaveBeenCalledWith(expect.stringContaining('Install MCP server'), { type: 'confirm' })
+      expect(mockLogger.prompt).toHaveBeenCalledWith(
+        expect.stringContaining('Install MCP server "test-package" in claude?'),
+        { type: 'confirm' },
+      )
     })
 
-    it('should not install if user declines confirmation', async () => {
+    it('should not install when user cancels', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
         target: 'test-package',
@@ -503,49 +302,11 @@ describe('install command', () => {
       expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
     })
 
-    it('should handle writeConfig error', async () => {
+    it('should handle local installation', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
         target: 'test-package',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      mockClientConfig.writeConfig.mockImplementation(() => {
-        throw new Error('Write error')
-      })
-
-      await handler(argv)
-
-      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Write error'))
-    })
-
-    it('should handle vscode with nested config key', async () => {
-      mockClientConfig.getConfigPath.mockReturnValue({
-        type: 'file',
-        path: '/test/config.json',
-        configKey: 'mcp.servers',
-      })
-
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'vscode',
-        target: 'test-package',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(expect.any(Object), 'vscode', undefined)
-    })
-
-    it('should handle headers with URL installation', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cursor',
-        target: 'https://example.com/server',
-        header: ['Authorization: Bearer token123', 'X-Custom-Header: value'],
+        local: true,
         yes: true,
         _: [],
         $0: 'install-mcp',
@@ -554,28 +315,127 @@ describe('install command', () => {
       await handler(argv)
 
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.any(Object),
+        'claude',
+        true, // local flag
+      )
+    })
+
+    it('should handle warp client differently', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'warp',
+        target: 'test-package',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Warp requires a manual installation through their UI.')
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"test-package"'))
+      expect(mockClientConfig.writeConfig).not.toHaveBeenCalled()
+    })
+
+    it('should handle warp client with URL', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'warp',
+        target: 'https://example.com/server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"mcp-remote@latest"'))
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"https://example.com/server"'))
+    })
+
+    it('should handle different config structures', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'vscode',
+        target: 'test-package',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      mockClientConfig.getConfigPath.mockReturnValue({
+        type: 'file',
+        path: '/test/settings.json',
+        configKey: 'mcp.servers',
+      })
+
+      // Mock the config to have the nested structure for VSCode
+      mockClientConfig.readConfig.mockReturnValue({ mcp: { servers: {} } })
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
         expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              url: 'https://example.com/server',
-              headers: {
-                Authorization: 'Bearer token123',
-                'X-Custom-Header': 'value',
+          mcp: {
+            servers: {
+              'test-package': {
+                command: 'npx',
+                args: ['test-package'],
               },
             },
           },
         }),
-        'cursor',
+        'vscode',
         undefined,
       )
     })
 
-    it('should handle headers with supergateway and different transports', async () => {
+    it('should handle existing servers in config', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'claude',
+        target: 'new-package',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      mockClientConfig.readConfig.mockReturnValue({
+        mcpServers: {
+          'existing-server': {
+            command: 'node',
+            args: ['existing.js'],
+          },
+        },
+      })
+
+      mockClientConfig.getNestedValue.mockImplementation((obj, path) => {
+        if (path === 'mcpServers') return obj.mcpServers
+        return undefined
+      })
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'existing-server': {
+              command: 'node',
+              args: ['existing.js'],
+            },
+            'new-package': {
+              command: 'npx',
+              args: ['new-package'],
+            },
+          },
+        }),
+        'claude',
+        undefined,
+      )
+    })
+
+    it('should handle headers with URL installation', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'cline',
         target: 'https://example.com/server',
-        header: ['Authorization: Bearer token123'],
-        transport: 'http',
+        header: ['Authorization: Bearer token123', 'X-Custom: value'],
         yes: true,
         _: [],
         $0: 'install-mcp',
@@ -590,11 +450,12 @@ describe('install command', () => {
               command: 'npx',
               args: [
                 '-y',
-                'supergateway',
-                '--streamableHttp',
+                'mcp-remote@latest',
                 'https://example.com/server',
                 '--header',
                 'Authorization: Bearer token123',
+                '--header',
+                'X-Custom: value',
               ],
             },
           },
@@ -604,107 +465,9 @@ describe('install command', () => {
       )
     })
 
-    it('should auto-detect SSE transport and install with confirmation', async () => {
+    it('should handle headers with warp client', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns sse and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('sse')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
-
-      await handler(argv)
-
-      expect(mockLogger.prompt).toHaveBeenCalledWith(
-        "We've detected that this server uses the SSE transport method. Is this correct?",
-        { type: 'confirm' },
-      )
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should use opposite transport when user rejects auto-detection', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns http but user rejects it
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(false) // rejects detected transport
-
-      await handler(argv)
-
-      expect(mockLogger.info).toHaveBeenCalledWith('Installing as SSE transport method.')
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--sse', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should fall back to manual questions when auto-detection returns unknown', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
-        target: 'https://example.com/server',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      // Mock auto-detection returns unknown
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('unknown')
-      mockLogger.prompt.mockResolvedValueOnce(true) // supports streamable HTTP
-
-      await handler(argv)
-
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Could not auto-detect transport type, please answer the following questions:',
-      )
-      expect(mockLogger.prompt).toHaveBeenCalledWith('Does this server support the streamable HTTP transport method?', {
-        type: 'confirm',
-      })
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            'example-com': {
-              command: 'npx',
-              args: ['-y', 'supergateway', '--streamableHttp', 'https://example.com/server'],
-            },
-          },
-        }),
-        'cline',
-        undefined,
-      )
-    })
-
-    it('should pass headers to detectMcpTransport when provided', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'cline',
+        client: 'warp',
         target: 'https://example.com/server',
         header: ['Authorization: Bearer token123'],
         yes: true,
@@ -712,26 +475,60 @@ describe('install command', () => {
         $0: 'install-mcp',
       }
 
-      // Mock auto-detection returns http and user confirms
-      mockDetectTransport.detectMcpTransport.mockResolvedValueOnce('http')
-      mockLogger.prompt.mockResolvedValueOnce(true) // confirms detected transport
+      await handler(argv)
+
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"--header"'))
+      expect(mockLogger.log).toHaveBeenCalledWith(expect.stringContaining('"Authorization: Bearer token123"'))
+    })
+
+    it('should handle error during write', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'claude',
+        target: 'test-package',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      const error = new Error('Write failed')
+      mockClientConfig.writeConfig.mockImplementation(() => {
+        throw error
+      })
 
       await handler(argv)
 
-      expect(mockDetectTransport.detectMcpTransport).toHaveBeenCalledWith('https://example.com/server', {
-        timeoutMs: 5000,
-        headers: {
-          Authorization: 'Bearer token123',
-        },
-      })
+      expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('Write failed'))
     })
-  })
 
-  describe('name inference', () => {
+    it('should infer name from npx command', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'claude',
+        target: 'npx -y @org/mcp-server',
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            '@org/mcp-server': {
+              command: 'npx',
+              args: ['-y', '@org/mcp-server'],
+            },
+          },
+        }),
+        'claude',
+        undefined,
+      )
+    })
+
     it('should infer name from URL', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
-        target: 'https://api.example.com/server',
+        target: 'https://api.example.com/mcp',
         yes: true,
         _: [],
         $0: 'install-mcp',
@@ -750,54 +547,10 @@ describe('install command', () => {
       )
     })
 
-    it('should infer name from npx command', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'claude',
-        target: 'npx -y @test/package',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            '@test/package': expect.any(Object),
-          },
-        }),
-        'claude',
-        undefined,
-      )
-    })
-
-    it('should infer name from node command', async () => {
-      const argv: ArgumentsCamelCase<InstallArgv> = {
-        client: 'claude',
-        target: 'node script.js',
-        yes: true,
-        _: [],
-        $0: 'install-mcp',
-      }
-
-      await handler(argv)
-
-      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mcpServers: {
-            node: expect.any(Object),
-          },
-        }),
-        'claude',
-        undefined,
-      )
-    })
-
     it('should handle malformed URL', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',
-        target: 'https://malformed/url/path',
+        target: 'https://[invalid-url',
         yes: true,
         _: [],
         $0: 'install-mcp',
@@ -808,7 +561,7 @@ describe('install command', () => {
       expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
         expect.objectContaining({
           mcpServers: {
-            malformed: expect.any(Object),
+            '[invalid-url': expect.any(Object),
           },
         }),
         'claude',
