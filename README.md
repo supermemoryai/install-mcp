@@ -107,6 +107,7 @@ The `--client` flag specifies which MCP client you're installing for:
 - `vscode`
 - `gemini-cli`
 - `claude-code`
+- `goose`
 - `warp` (outputs config to copy/paste into Warp's cloud-based settings)
 
 ## License

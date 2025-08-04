@@ -1,6 +1,6 @@
 {
   "name": "install-mcp",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "A CLI tool to install and manage MCP servers.",
   "bin": {
     "install-mcp": "./bin/run"
@@ -49,6 +49,7 @@
     "@jest/globals": "^29.7.0",
     "@tsconfig/node20": "^20.1.4",
     "@types/jest": "^29.5.12",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.12.12",
     "@types/prompts": "^2.4.9",
     "@types/signale": "^1.4.7",
@@ -76,6 +77,7 @@
     "consola": "^3.2.3",
     "dotenv": "^16.4.5",
     "giget": "^1.2.3",
+    "js-yaml": "^4.1.0",
     "picocolors": "^1.0.1",
     "yargs": "^17.7.2"
   },

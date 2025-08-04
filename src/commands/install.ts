@@ -18,6 +18,7 @@ function setServerConfig(
   configKey: string,
   serverName: string,
   serverConfig: ClientConfig,
+  client: string,
 ): void {
   // Get or create the nested config object
   let servers = getNestedValue(config, configKey)
@@ -28,7 +29,21 @@ function setServerConfig(
 
   // Set the server config
   if (servers) {
-    servers[serverName] = serverConfig
+    if (client === 'goose') {
+      // Goose has a different config structure
+      servers[serverName] = {
+        name: serverName,
+        cmd: serverConfig.command,
+        args: serverConfig.args,
+        enabled: true,
+        envs: {},
+        type: 'stdio',
+        timeout: 300,
+        ...serverConfig, // Allow overriding defaults
+      }
+    } else {
+      servers[serverName] = serverConfig
+    }
   }
 }
 
@@ -256,17 +271,29 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
             args.push('--header', header)
           }
         }
-        setServerConfig(config, configKey, name, {
-          command: 'npx',
-          args: args,
-        })
+        setServerConfig(
+          config,
+          configKey,
+          name,
+          {
+            command: 'npx',
+            args: args,
+          },
+          argv.client,
+        )
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
-        setServerConfig(config, configKey, name, {
-          command: cmdParts[0],
-          args: cmdParts.slice(1),
-        })
+        setServerConfig(
+          config,
+          configKey,
+          name,
+          {
+            command: cmdParts[0],
+            args: cmdParts.slice(1),
+          },
+          argv.client,
+        )
       }
 
       writeConfig(config, argv.client, argv.local)

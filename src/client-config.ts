@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import yaml from 'js-yaml'
 
 import { verbose } from './logger'
 // import { execFileSync } from "node:child_process"
@@ -16,6 +17,7 @@ interface ClientFileTarget {
   path: string
   localPath?: string
   configKey: string
+  format?: 'json' | 'yaml' // Add format property for different file types
 }
 type ClientInstallTarget = ClientFileTarget
 
@@ -117,6 +119,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       localPath: path.join(process.cwd(), '.mcp.json'),
       configKey: 'mcpServers',
     },
+    goose: {
+      type: 'file',
+      path: path.join(homeDir, '.config', 'goose', 'config.yaml'),
+      configKey: 'extensions',
+      format: 'yaml',
+    },
   }
 }
 
@@ -132,6 +140,7 @@ export const clientNames = [
   'gemini-cli',
   'vscode',
   'claude-code',
+  'goose',
 ]
 
 // Helper function to get nested value from an object using dot notation
@@ -197,7 +206,15 @@ export function readConfig(client: string, local?: boolean): ClientConfig {
     }
 
     verbose('Reading config file content')
-    const rawConfig = JSON.parse(fs.readFileSync(configPath.path, 'utf8'))
+    const fileContent = fs.readFileSync(configPath.path, 'utf8')
+
+    let rawConfig: ClientConfig
+    if (configPath.format === 'yaml') {
+      rawConfig = (yaml.load(fileContent) as ClientConfig) || {}
+    } else {
+      rawConfig = JSON.parse(fileContent)
+    }
+
     verbose(`Config loaded successfully: ${JSON.stringify(rawConfig, null, 2)}`)
 
     // Ensure the nested structure exists
@@ -261,7 +278,14 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
   try {
     if (fs.existsSync(target.path)) {
       verbose('Reading existing config file for merging')
-      existingConfig = JSON.parse(fs.readFileSync(target.path, 'utf8'))
+      const fileContent = fs.readFileSync(target.path, 'utf8')
+
+      if (target.format === 'yaml') {
+        existingConfig = (yaml.load(fileContent) as ClientConfig) || {}
+      } else {
+        existingConfig = JSON.parse(fileContent)
+      }
+
       verbose(`Existing config loaded: ${JSON.stringify(existingConfig, null, 2)}`)
     }
   } catch (error) {
@@ -274,6 +298,19 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
   verbose(`Merged config: ${JSON.stringify(mergedConfig, null, 2)}`)
 
   verbose(`Writing config to file: ${target.path}`)
-  fs.writeFileSync(target.path, JSON.stringify(mergedConfig, null, 2))
+
+  let configContent: string
+  if (target.format === 'yaml') {
+    configContent = yaml.dump(mergedConfig, {
+      indent: 2,
+      lineWidth: -1,
+      noRefs: true,
+    })
+  } else {
+    configContent = JSON.stringify(mergedConfig, null, 2)
+  }
+
+  fs.writeFileSync(target.path, configContent)
+  console.log(target.path)
   verbose('Config successfully written')
 }
