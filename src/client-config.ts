@@ -121,7 +121,7 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
     },
     goose: {
       type: 'file',
-      path: path.join(baseDir, 'goose', 'config.yaml'),
+      path: path.join(homeDir, '.config', 'goose', 'config.yaml'),
       configKey: 'extensions',
       format: 'yaml',
     },
@@ -207,14 +207,14 @@ export function readConfig(client: string, local?: boolean): ClientConfig {
 
     verbose('Reading config file content')
     const fileContent = fs.readFileSync(configPath.path, 'utf8')
-    
+
     let rawConfig: ClientConfig
     if (configPath.format === 'yaml') {
-      rawConfig = yaml.load(fileContent) as ClientConfig || {}
+      rawConfig = (yaml.load(fileContent) as ClientConfig) || {}
     } else {
       rawConfig = JSON.parse(fileContent)
     }
-    
+
     verbose(`Config loaded successfully: ${JSON.stringify(rawConfig, null, 2)}`)
 
     // Ensure the nested structure exists
@@ -279,13 +279,13 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
     if (fs.existsSync(target.path)) {
       verbose('Reading existing config file for merging')
       const fileContent = fs.readFileSync(target.path, 'utf8')
-      
+
       if (target.format === 'yaml') {
-        existingConfig = yaml.load(fileContent) as ClientConfig || {}
+        existingConfig = (yaml.load(fileContent) as ClientConfig) || {}
       } else {
         existingConfig = JSON.parse(fileContent)
       }
-      
+
       verbose(`Existing config loaded: ${JSON.stringify(existingConfig, null, 2)}`)
     }
   } catch (error) {
@@ -298,18 +298,19 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
   verbose(`Merged config: ${JSON.stringify(mergedConfig, null, 2)}`)
 
   verbose(`Writing config to file: ${target.path}`)
-  
+
   let configContent: string
   if (target.format === 'yaml') {
-    configContent = yaml.dump(mergedConfig, { 
+    configContent = yaml.dump(mergedConfig, {
       indent: 2,
       lineWidth: -1,
-      noRefs: true
+      noRefs: true,
     })
   } else {
     configContent = JSON.stringify(mergedConfig, null, 2)
   }
-  
+
   fs.writeFileSync(target.path, configContent)
+  console.log(target.path)
   verbose('Config successfully written')
 }

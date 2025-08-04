@@ -271,17 +271,29 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
             args.push('--header', header)
           }
         }
-        setServerConfig(config, configKey, name, {
-          command: 'npx',
-          args: args,
-        }, argv.client)
+        setServerConfig(
+          config,
+          configKey,
+          name,
+          {
+            command: 'npx',
+            args: args,
+          },
+          argv.client,
+        )
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
-        setServerConfig(config, configKey, name, {
-          command: cmdParts[0],
-          args: cmdParts.slice(1),
-        }, argv.client)
+        setServerConfig(
+          config,
+          configKey,
+          name,
+          {
+            command: cmdParts[0],
+            args: cmdParts.slice(1),
+          },
+          argv.client,
+        )
       }
 
       writeConfig(config, argv.client, argv.local)
