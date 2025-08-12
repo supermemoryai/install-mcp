@@ -55,12 +55,14 @@ describe('client-config', () => {
           'gemini-cli',
           'vscode',
           'claude-code',
+          'goose',
+          'zed',
         ]),
       )
     })
 
-    it('should have at least 11 clients', () => {
-      expect(clientNames.length).toBeGreaterThanOrEqual(11)
+    it('should have at least 13 clients', () => {
+      expect(clientNames.length).toBeGreaterThanOrEqual(13)
     })
   })
 

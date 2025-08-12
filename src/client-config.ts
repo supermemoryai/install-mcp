@@ -125,6 +125,14 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       configKey: 'extensions',
       format: 'yaml',
     },
+    zed: {
+      type: 'file',
+      path:
+        process.platform === 'win32'
+          ? path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'Zed', 'settings.json')
+          : path.join(homeDir, '.config', 'zed', 'settings.json'),
+      configKey: 'context_servers',
+    },
   }
 }
 
@@ -141,6 +149,7 @@ export const clientNames = [
   'vscode',
   'claude-code',
   'goose',
+  'zed',
 ]
 
 // Helper function to get nested value from an object using dot notation

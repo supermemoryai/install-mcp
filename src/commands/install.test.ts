@@ -20,7 +20,7 @@ describe('install command', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     Object.defineProperty(mockClientConfig, 'clientNames', {
-      value: ['claude', 'cline', 'cursor', 'vscode', 'warp'],
+      value: ['claude', 'cline', 'cursor', 'vscode', 'warp', 'goose', 'zed'],
       writable: true,
     })
     mockClientConfig.readConfig.mockReturnValue({ mcpServers: {} })
