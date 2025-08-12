@@ -41,6 +41,15 @@ function setServerConfig(
         timeout: 300,
         ...serverConfig, // Allow overriding defaults
       }
+    } else if (client === 'zed') {
+      // Zed has a different config structure
+      servers[serverName] = {
+        source: 'custom',
+        command: serverConfig.command,
+        args: serverConfig.args,
+        env: {},
+        ...serverConfig, // Allow overriding defaults
+      }
     } else {
       servers[serverName] = serverConfig
     }
