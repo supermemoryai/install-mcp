@@ -127,7 +127,10 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
     },
     zed: {
       type: 'file',
-      path: path.join(homeDir, '.config', 'zed', 'settings.json'),
+      path:
+        process.platform === 'win32'
+          ? path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'Zed', 'settings.json')
+          : path.join(homeDir, '.config', 'zed', 'settings.json'),
       configKey: 'context_servers',
     },
   }
