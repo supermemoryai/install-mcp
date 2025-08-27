@@ -39,6 +39,31 @@ The tool automatically:
 - Infers server names from package names or URLs (e.g., `mcp.example.com` → `mcp-example-com`)
 - Handles OAuth authentication for remote servers
 
+### Supermemory project support
+
+When installing a server hosted on `https://api.supermemory.ai/*`, you can pass a project name via `--project`. This is a convenience alias for adding the header `x-sm-project: <value>`.
+
+Rules:
+
+- Only applies to URL installs targeting `https://api.supermemory.ai/*`.
+- Values must not contain spaces.
+- If you omit `--project` for these URLs, you'll be prompted. Pressing Enter uses `default`.
+- The value is injected as a header alongside any `--header` flags.
+
+Examples:
+
+```bash
+# Explicit project
+npx install-mcp https://api.supermemory.ai/servers/my-server \
+  --client cursor \
+  --project myproj
+
+# Prompted for project (Enter defaults to "default")
+npx install-mcp https://api.supermemory.ai/servers/my-server --client cursor
+```
+
+Warp users: the generated config will include `--header "x-sm-project: <value>"` in the `args` array when installing Supermemory URLs.
+
 ### Headers Support
 
 You can pass headers for authentication or other purposes using the `--header` flag:
