@@ -64,6 +64,7 @@ export interface InstallArgv {
   yes?: boolean
   header?: string[]
   oauth?: 'yes' | 'no'
+  project?: string
 }
 
 export const command = '$0 [target]'
@@ -100,6 +101,7 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
+    .option('project', { type: 'string', description: 'Project for https://api.supermemory.ai/*' })
     .option('oauth', {
       type: 'string',
       description: 'Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.',
@@ -154,6 +156,15 @@ function buildCommand(input: string): string {
   }
 }
 
+function isSupermemoryUrl(input: string): boolean {
+  try {
+    const url = new URL(input)
+    return url.hostname === 'api.supermemory.ai'
+  } catch {
+    return false
+  }
+}
+
 // Run the authentication flow for remote servers before installation.
 async function runAuthentication(url: string): Promise<void> {
   logger.info(`Running authentication for ${url}`)
@@ -190,6 +201,24 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
 
+  // Resolve Supermemory project header when installing its URL
+  let projectHeader: string | undefined
+  if (isUrl(target) && isSupermemoryUrl(target)) {
+    let project = typeof argv.project === 'string' ? argv.project : undefined
+    if (!project || project.trim() === '') {
+      const input = (await logger.prompt(
+        'Enter your Supermemory project (no spaces). Press Enter for "default" (you can override per LLM session).',
+        { type: 'text' },
+      )) as string
+      project = (input || '').trim() || 'default'
+    }
+    if (/\s/.test(project)) {
+      logger.error('Project must not contain spaces. Use hyphens or underscores instead.')
+      return
+    }
+    projectHeader = `x-sm-project:${project}`
+  }
+
   if (argv.client === 'warp') {
     logger.log('')
     logger.info('Warp requires a manual installation through their UI.')
@@ -204,6 +233,9 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         for (const header of argv.header) {
           warpArgs.push('--header', header)
         }
+      }
+      if (projectHeader) {
+        warpArgs.push('--header', projectHeader)
       }
     } else {
       warpArgs = command.split(' ').slice(1)
@@ -279,6 +311,9 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           for (const header of argv.header) {
             args.push('--header', header)
           }
+        }
+        if (projectHeader) {
+          args.push('--header', projectHeader)
         }
         setServerConfig(
           config,
