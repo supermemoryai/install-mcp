@@ -79,6 +79,7 @@
 		"giget": "^1.2.5",
 		"js-yaml": "^4.1.0",
 		"picocolors": "^1.1.1",
+		"@iarna/toml": "^2.2.5",
 		"yargs": "^17.7.2"
 	},
 	"pnpm": {
