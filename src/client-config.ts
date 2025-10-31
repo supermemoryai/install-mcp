@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import * as TOML from '@iarna/toml'
 import yaml from 'js-yaml'
 
-import { verbose } from './logger'
+import { logger, verbose } from './logger'
 // import { execFileSync } from "node:child_process"
 
 export interface ClientConfig {
@@ -17,7 +18,7 @@ interface ClientFileTarget {
   path: string
   localPath?: string
   configKey: string
-  format?: 'json' | 'yaml' // Add format property for different file types
+  format?: 'json' | 'yaml' | 'toml' // Add format property for different file types
 }
 type ClientInstallTarget = ClientFileTarget
 
@@ -133,6 +134,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
           : path.join(homeDir, '.config', 'zed', 'settings.json'),
       configKey: 'context_servers',
     },
+    codex: {
+      type: 'file',
+      path: path.join(process.env.CODEX_HOME || path.join(homeDir, '.codex'), 'config.toml'),
+      configKey: 'mcp_servers',
+      format: 'toml',
+    },
   }
 }
 
@@ -150,6 +157,7 @@ export const clientNames = [
   'claude-code',
   'goose',
   'zed',
+  'codex',
 ]
 
 // Helper function to get nested value from an object using dot notation
@@ -220,6 +228,8 @@ export function readConfig(client: string, local?: boolean): ClientConfig {
     let rawConfig: ClientConfig
     if (configPath.format === 'yaml') {
       rawConfig = (yaml.load(fileContent) as ClientConfig) || {}
+    } else if (configPath.format === 'toml') {
+      rawConfig = TOML.parse(fileContent) as ClientConfig
     } else {
       rawConfig = JSON.parse(fileContent)
     }
@@ -291,6 +301,8 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
 
       if (target.format === 'yaml') {
         existingConfig = (yaml.load(fileContent) as ClientConfig) || {}
+      } else if (target.format === 'toml') {
+        existingConfig = TOML.parse(fileContent) as ClientConfig
       } else {
         existingConfig = JSON.parse(fileContent)
       }
@@ -315,11 +327,13 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
       lineWidth: -1,
       noRefs: true,
     })
+  } else if (target.format === 'toml') {
+    configContent = TOML.stringify(mergedConfig)
   } else {
     configContent = JSON.stringify(mergedConfig, null, 2)
   }
 
   fs.writeFileSync(target.path, configContent)
-  console.log(target.path)
+  logger.info(`Config written to: ${target.path}`)
   verbose('Config successfully written')
 }

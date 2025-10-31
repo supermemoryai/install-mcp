@@ -135,6 +135,7 @@ The `--client` flag specifies which MCP client you're installing for:
 - `goose`
 - `zed`
 - `warp` (outputs config to copy/paste into Warp's cloud-based settings)
+- `codex` (OpenAI's Codex CLI tool)
 
 ## License
 

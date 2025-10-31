@@ -655,6 +655,119 @@ describe('install command', () => {
       )
     })
 
+    it('should handle environment variables with --env flag', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'claude',
+        target: 'test-package',
+        env: ['API_KEY', 'secret123', 'DEBUG', 'true'],
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'test-package': {
+              command: 'npx',
+              args: ['test-package'],
+              env: {
+                API_KEY: 'secret123',
+                DEBUG: 'true',
+              },
+            },
+          },
+        }),
+        'claude',
+        undefined,
+      )
+    })
+
+    it('should handle environment variables with URL installation', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'cline',
+        target: 'https://example.com/server',
+        env: ['TOKEN', 'abc123'],
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      // Mock OAuth prompt to return false
+      mockLogger.prompt.mockResolvedValueOnce(false)
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: {
+            'example-com': {
+              command: 'npx',
+              args: ['-y', 'mcp-remote@latest', 'https://example.com/server'],
+              env: {
+                TOKEN: 'abc123',
+              },
+            },
+          },
+        }),
+        'cline',
+        undefined,
+      )
+    })
+
+    it('should handle goose client with environment variables (using envs field)', async () => {
+      const argv: ArgumentsCamelCase<InstallArgv> = {
+        client: 'goose',
+        target: 'test-package',
+        env: ['VAR1', 'value1', 'VAR2', 'value2'],
+        yes: true,
+        _: [],
+        $0: 'install-mcp',
+      }
+
+      mockClientConfig.getConfigPath.mockReturnValue({
+        type: 'file',
+        path: '/test/goose-config.yaml',
+        configKey: 'extensions',
+        format: 'yaml',
+      })
+
+      mockClientConfig.readConfig.mockReturnValue({ extensions: {} })
+
+      // Add mock for getNestedValue to handle 'extensions' key
+      mockClientConfig.getNestedValue.mockImplementation((obj, path) => {
+        if (path === 'extensions') return obj.extensions || {}
+        if (path === 'mcpServers') return obj.mcpServers || {}
+        if (path === 'mcp.servers') return obj.mcp?.servers || {}
+        return undefined
+      })
+
+      await handler(argv)
+
+      expect(mockClientConfig.writeConfig).toHaveBeenCalledWith(
+        expect.objectContaining({
+          extensions: {
+            'test-package': expect.objectContaining({
+              name: 'test-package',
+              cmd: 'npx',
+              args: ['test-package'],
+              enabled: true,
+              envs: {
+                VAR1: 'value1',
+                VAR2: 'value2',
+              },
+              type: 'stdio',
+              timeout: 300,
+            }),
+          },
+        }),
+        'goose',
+        undefined,
+      )
+    })
+
     it('should handle malformed URL', async () => {
       const argv: ArgumentsCamelCase<InstallArgv> = {
         client: 'claude',

@@ -57,12 +57,13 @@ describe('client-config', () => {
           'claude-code',
           'goose',
           'zed',
+          'codex',
         ]),
       )
     })
 
-    it('should have at least 13 clients', () => {
-      expect(clientNames.length).toBeGreaterThanOrEqual(13)
+    it('should have at least 14 clients', () => {
+      expect(clientNames.length).toBeGreaterThanOrEqual(14)
     })
   })
 
@@ -171,6 +172,11 @@ describe('client-config', () => {
       const result = getConfigPath('vscode')
       expect(result.configKey).toBe('mcp.servers')
     })
+
+    it('should handle codex with nested config key', () => {
+      const result = getConfigPath('codex')
+      expect(result.configKey).toBe('mcp_servers')
+    })
   })
 
   describe('readConfig', () => {
@@ -212,6 +218,13 @@ describe('client-config', () => {
 
       const result = readConfig('vscode')
       expect(result).toEqual({ mcp: { servers: {} } })
+    })
+
+    it('should handle codex nested config key', () => {
+      mockFs.existsSync.mockReturnValue(false)
+
+      const result = readConfig('codex')
+      expect(result).toEqual({ mcp_servers: {} })
     })
   })
 
@@ -275,6 +288,13 @@ describe('client-config', () => {
       const config = { mcpServers: { server1: { command: 'test' } } }
 
       writeConfig(config, 'claude')
+
+      expect(mockFs.writeFileSync).toHaveBeenCalled()
+    })
+
+    it('should handle codex nested config key', () => {
+      const config = { mcp_servers: { server1: { command: 'test' } } }
+      writeConfig(config, 'codex')
 
       expect(mockFs.writeFileSync).toHaveBeenCalled()
     })
