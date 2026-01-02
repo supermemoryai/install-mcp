@@ -50,6 +50,43 @@ function setServerConfig(
         env: {},
         ...serverConfig, // Allow overriding defaults
       }
+    } else if (client === 'opencode') {
+      // OpenCode has a different config structure for MCP servers
+      if (serverConfig.command === 'npx' && serverConfig.args?.includes('mcp-remote@latest')) {
+        // For remote MCP servers, OpenCode uses a different structure
+        const urlIndex = serverConfig.args.indexOf('mcp-remote@latest') + 1
+        const url = serverConfig.args[urlIndex]
+        const headers: Record<string, string> = {}
+        
+        // Extract headers from args
+        let i = serverConfig.args.indexOf('--header') + 1
+        while (i > 0 && i < serverConfig.args.length) {
+          const headerArg = serverConfig.args[i]
+          if (headerArg && !headerArg.startsWith('--')) {
+            const [key, value] = headerArg.split(':')
+            if (key && value) {
+              headers[key.trim()] = value.trim()
+            }
+          }
+          i = serverConfig.args.indexOf('--header', i) + 1
+        }
+        
+        servers[serverName] = {
+          type: 'remote',
+          url: url,
+          enabled: true,
+          headers: Object.keys(headers).length > 0 ? headers : undefined,
+        }
+      } else {
+        // For local MCP servers
+        servers[serverName] = {
+          type: 'local',
+          command: serverConfig.command,
+          args: serverConfig.args || [],
+          enabled: true,
+          environment: {},
+        }
+      }
     } else {
       servers[serverName] = serverConfig
     }
