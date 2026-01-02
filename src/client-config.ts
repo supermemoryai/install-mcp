@@ -4,6 +4,7 @@ import path from 'node:path'
 import process from 'node:process'
 import * as TOML from '@iarna/toml'
 import yaml from 'js-yaml'
+import * as jsonc from 'jsonc-parser'
 
 import { logger, verbose } from './logger'
 // import { execFileSync } from "node:child_process"
@@ -246,6 +247,9 @@ export function readConfig(client: string, local?: boolean): ClientConfig {
       rawConfig = (yaml.load(fileContent) as ClientConfig) || {}
     } else if (configPath.format === 'toml') {
       rawConfig = TOML.parse(fileContent) as ClientConfig
+    } else if (configPath.path.endsWith('.jsonc')) {
+      // Use jsonc-parser for .jsonc files to support comments
+      rawConfig = jsonc.parse(fileContent) as ClientConfig
     } else {
       rawConfig = JSON.parse(fileContent)
     }
@@ -310,17 +314,21 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
   let existingConfig: ClientConfig = {}
   setNestedValue(existingConfig, target.configKey, {})
 
+  let originalFileContent = ''
   try {
     if (fs.existsSync(target.path)) {
       verbose('Reading existing config file for merging')
-      const fileContent = fs.readFileSync(target.path, 'utf8')
+      originalFileContent = fs.readFileSync(target.path, 'utf8')
 
       if (target.format === 'yaml') {
-        existingConfig = (yaml.load(fileContent) as ClientConfig) || {}
+        existingConfig = (yaml.load(originalFileContent) as ClientConfig) || {}
       } else if (target.format === 'toml') {
-        existingConfig = TOML.parse(fileContent) as ClientConfig
+        existingConfig = TOML.parse(originalFileContent) as ClientConfig
+      } else if (target.path.endsWith('.jsonc')) {
+        // Use jsonc-parser for .jsonc files to support comments
+        existingConfig = jsonc.parse(originalFileContent) as ClientConfig
       } else {
-        existingConfig = JSON.parse(fileContent)
+        existingConfig = JSON.parse(originalFileContent)
       }
 
       verbose(`Existing config loaded: ${JSON.stringify(existingConfig, null, 2)}`)
@@ -345,6 +353,30 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
     })
   } else if (target.format === 'toml') {
     configContent = TOML.stringify(mergedConfig)
+  } else if (target.path.endsWith('.jsonc') && originalFileContent) {
+    // For .jsonc files, try to preserve comments and formatting using jsonc-parser
+    try {
+      // Apply modifications to preserve existing structure
+      let editedContent = originalFileContent
+      const modifications: jsonc.Edit[] = []
+
+      // Generate edit operations for each key in the merged config
+      for (const key of Object.keys(mergedConfig)) {
+        const path = [key]
+        const edits = jsonc.modify(editedContent, path, mergedConfig[key], {
+          formattingOptions: { tabSize: 2, insertSpaces: true },
+        })
+        modifications.push(...edits)
+      }
+
+      // Apply all edits
+      configContent = jsonc.applyEdits(originalFileContent, modifications)
+    } catch (error) {
+      // Fallback to standard JSON.stringify if edit fails
+      verbose(`Error applying JSONC edits: ${error instanceof Error ? error.message : String(error)}`)
+      verbose('Falling back to JSON.stringify (comments will be lost)')
+      configContent = JSON.stringify(mergedConfig, null, 2)
+    }
   } else {
     configContent = JSON.stringify(mergedConfig, null, 2)
   }
