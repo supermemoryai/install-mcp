@@ -6,7 +6,6 @@ tsconfig.json
 .env.example
 .releaserc.json
 commitlint.config.js
-jest.config.js
 tsup.config.ts
 coverage
 .idea

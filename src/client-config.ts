@@ -140,6 +140,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       configKey: 'mcp_servers',
       format: 'toml',
     },
+    opencode: {
+      type: 'file',
+      path: path.join(homeDir, '.config', 'opencode', 'opencode.json'),
+      localPath: path.join(process.cwd(), '.opencode.json'),
+      configKey: 'mcp',
+    },
   }
 }
 
@@ -158,6 +164,7 @@ export const clientNames = [
   'goose',
   'zed',
   'codex',
+  'opencode',
 ]
 
 // Helper function to get nested value from an object using dot notation
@@ -203,6 +210,15 @@ export function getConfigPath(client?: string, local?: boolean): ClientInstallTa
   if (local && configTarget.localPath) {
     verbose(`Using local config path for ${normalizedClient}: ${configTarget.localPath}`)
     return { ...configTarget, path: configTarget.localPath }
+  }
+
+  // For OpenCode, check if .jsonc exists and prefer it over .json
+  if (normalizedClient === 'opencode') {
+    const jsoncPath = configTarget.path.replace('.json', '.jsonc')
+    if (fs.existsSync(jsoncPath)) {
+      verbose(`Found .jsonc file for OpenCode, using: ${jsoncPath}`)
+      return { ...configTarget, path: jsoncPath }
+    }
   }
 
   verbose(`Using default config path for ${normalizedClient}: ${configTarget.path}`)

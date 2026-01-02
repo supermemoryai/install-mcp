@@ -1,0 +1,60 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "files": {
+    "include": ["**/*.{js,jsx,ts,tsx,json,jsonc}"],
+    "ignore": ["node_modules/**", ".git/**", "dist/**", "coverage/**", "*.lock"]
+  },
+  "formatter": {
+    "enabled": true,
+    "lineWidth": 120,
+    "lineEnding": "lf",
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "quoteStyle": "single"
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "generic"
+          }
+        },
+        "useImportType": "error"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error"
+      },
+      "suspicious": {
+        "noConsole": "warn",
+        "noConsoleLog": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "trailingCommas": "es5",
+      "quoteProperties": "asNeeded"
+    }
+  },
+  "typescript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "trailingCommas": "es5",
+      "quoteProperties": "asNeeded"
+    }
+  },
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  }
+}
