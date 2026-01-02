@@ -1,8 +1,6 @@
 src
 tsconfig.json
-.prettierrc
-.eslintignore
-.eslint.cjs
+
 .env.example
 .releaserc.json
 commitlint.config.js

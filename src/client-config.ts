@@ -9,7 +9,6 @@ import { logger, verbose } from './logger'
 // import { execFileSync } from "node:child_process"
 
 export interface ClientConfig {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
 

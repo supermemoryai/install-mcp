@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 // Detect whether an MCP server at `baseUrl` speaks the **new Streamable HTTP** transport ("http"),
 // the **legacy HTTP+SSE** transport ("sse"), or cannot be determined ("unknown").
 //
