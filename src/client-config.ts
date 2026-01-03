@@ -57,6 +57,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
 
   return {
     claude: { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
+    droid: {
+      type: 'file',
+      path: path.join(homeDir, '.factory', 'mcp.json'),
+      localPath: path.join(process.cwd(), '.factory', 'mcp.json'),
+      configKey: 'mcpServers',
+    },
     cline: {
       type: 'file',
       path: path.join(
@@ -152,6 +158,7 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
 
 export const clientNames = [
   'claude',
+  'droid',
   'cline',
   'roo-cline',
   'windsurf',

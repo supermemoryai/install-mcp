@@ -137,6 +137,7 @@ The `--client` flag specifies which MCP client you're installing for:
 - `opencode`
 - `warp` (outputs config to copy/paste into Warp's cloud-based settings)
 - `codex` (OpenAI's Codex CLI tool)
+- `droid` (Factory.AI's Droid CLI tool)
 
 ## License
 
