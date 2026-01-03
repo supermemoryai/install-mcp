@@ -138,6 +138,8 @@ The `--client` flag specifies which MCP client you're installing for:
 - `warp` (outputs config to copy/paste into Warp's cloud-based settings)
 - `codex` (OpenAI's Codex CLI tool)
 - `droid` (Factory.AI's Droid CLI tool)
+- `aider` (AI pair programming tool)
+- `aider-desk` (Desktop version of aider)
 
 ## License
 

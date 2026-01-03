@@ -30,16 +30,17 @@ function setServerConfig(
   // Set the server config
   if (servers) {
     if (client === 'goose') {
-      // Goose has a different config structure
+      // Goose has a different config structure and uses 'envs' instead of 'env'
+      const { env, command, args, ...rest } = serverConfig
       servers[serverName] = {
         name: serverName,
-        cmd: serverConfig.command,
-        args: serverConfig.args,
+        cmd: command,
+        args: args,
         enabled: true,
-        envs: {},
+        envs: env || {},
         type: 'stdio',
         timeout: 300,
-        ...serverConfig, // Allow overriding defaults
+        ...rest, // Allow overriding other defaults
       }
     } else if (client === 'zed') {
       // Zed has a different config structure
@@ -47,7 +48,7 @@ function setServerConfig(
         source: 'custom',
         command: serverConfig.command,
         args: serverConfig.args,
-        env: {},
+        env: serverConfig.env || {},
         ...serverConfig, // Allow overriding defaults
       }
     } else if (client === 'opencode') {
@@ -102,6 +103,7 @@ export interface InstallArgv {
   header?: string[]
   oauth?: 'yes' | 'no'
   project?: string
+  env?: string[]
 }
 
 export const command = '$0 [target]'
@@ -144,6 +146,11 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.',
       choices: ['yes', 'no'],
     } as const)
+    .option('env', {
+      type: 'array',
+      description: 'Environment variables to pass to the server (format: --env key value)',
+      default: [],
+    })
 }
 
 function isUrl(input: string): boolean {
@@ -202,6 +209,24 @@ function isSupermemoryUrl(input: string): boolean {
   }
 }
 
+// Parse environment variables from array format into key-value object
+function parseEnvVars(envArray?: string[]): { [key: string]: string } | undefined {
+  if (!envArray || envArray.length === 0) {
+    return undefined
+  }
+
+  const envObj: { [key: string]: string } = {}
+  for (let i = 0; i < envArray.length; i += 2) {
+    const key = envArray[i]
+    const value = envArray[i + 1]
+    if (key && value !== undefined) {
+      envObj[key] = value
+    }
+  }
+
+  return Object.keys(envObj).length > 0 ? envObj : undefined
+}
+
 // Run the authentication flow for remote servers before installation.
 async function runAuthentication(url: string): Promise<void> {
   logger.info(`Running authentication for ${url}`)
@@ -237,6 +262,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
   const name = argv.name || inferNameFromInput(target)
   const command = buildCommand(target)
+  const envVars = parseEnvVars(argv.env)
 
   // Resolve Supermemory project header when installing its URL
   let projectHeader: string | undefined
@@ -284,7 +310,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           [name]: {
             command: isUrl(target) ? 'npx' : command.split(' ')[0],
             args: warpArgs,
-            env: {},
+            env: envVars || {},
             working_directory: null,
             start_on_launch: true,
           },
@@ -352,29 +378,25 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         if (projectHeader) {
           args.push('--header', projectHeader)
         }
-        setServerConfig(
-          config,
-          configKey,
-          name,
-          {
-            command: 'npx',
-            args: args,
-          },
-          argv.client,
-        )
+        const serverConfig: ClientConfig = {
+          command: 'npx',
+          args: args,
+        }
+        if (envVars) {
+          serverConfig.env = envVars
+        }
+        setServerConfig(config, configKey, name, serverConfig, argv.client)
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
-        setServerConfig(
-          config,
-          configKey,
-          name,
-          {
-            command: cmdParts[0],
-            args: cmdParts.slice(1),
-          },
-          argv.client,
-        )
+        const serverConfig: ClientConfig = {
+          command: cmdParts[0],
+          args: cmdParts.slice(1),
+        }
+        if (envVars) {
+          serverConfig.env = envVars
+        }
+        setServerConfig(config, configKey, name, serverConfig, argv.client)
       }
 
       writeConfig(config, argv.client, argv.local)

@@ -117,9 +117,9 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
     },
     vscode: {
       type: 'file',
-      path: path.join(baseDir, vscodePath, 'settings.json'),
-      localPath: path.join(process.cwd(), '.vscode', 'settings.json'),
-      configKey: 'mcp.servers',
+      path: path.join(baseDir, vscodePath, 'mcp.json'),
+      localPath: path.join(process.cwd(), '.vscode', 'mcp.json'),
+      configKey: 'mcpServers',
     },
     'claude-code': {
       type: 'file',
@@ -153,6 +153,23 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       localPath: path.join(process.cwd(), '.opencode.json'),
       configKey: 'mcp',
     },
+    aider: {
+      type: 'file',
+      path: path.join(homeDir, '.aider', 'mcp.yml'),
+      localPath: path.join(process.cwd(), '.aider.mcp.yml'),
+      configKey: 'servers',
+      format: 'yaml',
+    },
+    'aider-desk': {
+      type: 'file',
+      path:
+        process.platform === 'win32'
+          ? path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'aider-desk', 'settings.json')
+          : process.platform === 'darwin'
+            ? path.join(homeDir, 'Library', 'Application Support', 'aider-desk', 'settings.json')
+            : path.join(homeDir, '.config', 'aider-desk', 'settings.json'),
+      configKey: 'mcpServers',
+    },
   }
 }
 
@@ -173,6 +190,8 @@ export const clientNames = [
   'zed',
   'codex',
   'opencode',
+  'aider',
+  'aider-desk',
 ]
 
 // Helper function to get nested value from an object using dot notation
