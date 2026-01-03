@@ -111,9 +111,9 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
     },
     vscode: {
       type: 'file',
-      path: path.join(baseDir, vscodePath, 'settings.json'),
-      localPath: path.join(process.cwd(), '.vscode', 'settings.json'),
-      configKey: 'mcp.servers',
+      path: path.join(baseDir, vscodePath, 'mcp.json'),
+      localPath: path.join(process.cwd(), '.vscode', 'mcp.json'),
+      configKey: 'mcpServers',
     },
     'claude-code': {
       type: 'file',
