@@ -10,7 +10,7 @@ import {
   setNestedValue,
   type ClientConfig,
 } from '../client-config'
-import { spawn } from 'child_process'
+import { spawn } from 'node:child_process'
 
 // Helper to set a server config in a nested structure
 function setServerConfig(
@@ -100,10 +100,10 @@ export interface InstallArgv {
   client: string
   local?: boolean
   yes?: boolean
-  header?: string[]
+  header?: Array<string>
   oauth?: 'yes' | 'no'
   project?: string
-  env?: string[]
+  env?: Array<string>
 }
 
 export const command = '$0 [target]'
@@ -179,10 +179,10 @@ function inferNameFromInput(input: string): string {
       // Skip flags like -y and get the package name
       const packageIndex = parts.findIndex((part, index) => index > 0 && !part.startsWith('-'))
       if (packageIndex !== -1) {
-        return parts[packageIndex]!
+        return parts[packageIndex] || 'server'
       }
     }
-    return parts[0]!
+    return parts[0] || 'server'
   } else {
     // Simple package name like "mcp-server" or "@org/mcp-server"
     return input
@@ -210,7 +210,7 @@ function isSupermemoryUrl(input: string): boolean {
 }
 
 // Parse environment variables from array format into key-value object
-function parseEnvVars(envArray?: string[]): { [key: string]: string } | undefined {
+function parseEnvVars(envArray?: Array<string>): { [key: string]: string } | undefined {
   if (!envArray || envArray.length === 0) {
     return undefined
   }
@@ -288,7 +288,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
 
     // Build args array for Warp
-    let warpArgs: string[]
+    let warpArgs: Array<string>
     if (isUrl(target)) {
       warpArgs = ['-y', 'mcp-remote@latest', target]
       // Add headers as arguments for supergateway
@@ -319,7 +319,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         2,
       )
         .split('\n')
-        .map((line) => green('  ' + line))
+        .map((line) => green(`  ${line}`))
         .join('\n'),
     )
     logger.box("Read Warp's documentation at", blue('https://docs.warp.dev/knowledge-and-collaboration/mcp'))

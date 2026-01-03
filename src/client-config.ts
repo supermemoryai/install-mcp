@@ -11,6 +11,7 @@ import { logger, verbose } from './logger'
 
 export interface ClientConfig {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: ClientConfig must be flexible to support any client configuration structure
   [key: string]: any
 }
 
@@ -211,7 +212,8 @@ export function getNestedValue(obj: ClientConfig, path: string): ClientConfig | 
 // Helper function to set nested value in an object using dot notation
 export function setNestedValue(obj: ClientConfig, path: string, value: ClientConfig): void {
   const keys = path.split('.')
-  const lastKey = keys.pop()!
+  const lastKey = keys.pop()
+  if (!lastKey) return
   const target = keys.reduce((current, key) => {
     if (!current[key]) current[key] = {}
     return current[key]
@@ -383,8 +385,8 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
     // For .jsonc files, try to preserve comments and formatting using jsonc-parser
     try {
       // Apply modifications to preserve existing structure
-      let editedContent = originalFileContent
-      const modifications: jsonc.Edit[] = []
+      const editedContent = originalFileContent
+      const modifications: Array<jsonc.Edit> = []
 
       // Generate edit operations for each key in the merged config
       for (const key of Object.keys(mergedConfig)) {
