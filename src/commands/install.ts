@@ -1,6 +1,6 @@
-import type { ArgumentsCamelCase, Argv } from 'yargs'
-import { logger } from '../logger'
-import { blue, green, red } from 'picocolors'
+import type { ArgumentsCamelCase, Argv } from "yargs"
+import { logger } from "../logger"
+import { blue, green, red } from "picocolors"
 import {
   clientNames,
   readConfig,
@@ -9,8 +9,8 @@ import {
   getNestedValue,
   setNestedValue,
   type ClientConfig,
-} from '../client-config'
-import { spawn } from 'node:child_process'
+} from "../client-config"
+import { spawn } from "node:child_process"
 
 // Helper to set a server config in a nested structure
 function setServerConfig(
@@ -18,7 +18,7 @@ function setServerConfig(
   configKey: string,
   serverName: string,
   serverConfig: ClientConfig,
-  client: string,
+  client: string
 ): void {
   // Get or create the nested config object
   let servers = getNestedValue(config, configKey)
@@ -29,7 +29,7 @@ function setServerConfig(
 
   // Set the server config
   if (servers) {
-    if (client === 'goose') {
+    if (client === "goose") {
       // Goose has a different config structure and uses 'envs' instead of 'env'
       const { env, command, args, ...rest } = serverConfig
       servers[serverName] = {
@@ -38,42 +38,42 @@ function setServerConfig(
         args: args,
         enabled: true,
         envs: env || {},
-        type: 'stdio',
+        type: "stdio",
         timeout: 300,
         ...rest, // Allow overriding other defaults
       }
-    } else if (client === 'zed') {
+    } else if (client === "zed") {
       // Zed has a different config structure
       servers[serverName] = {
-        source: 'custom',
+        source: "custom",
         command: serverConfig.command,
         args: serverConfig.args,
         env: serverConfig.env || {},
         ...serverConfig, // Allow overriding defaults
       }
-    } else if (client === 'opencode') {
+    } else if (client === "opencode") {
       // OpenCode has a different config structure for MCP servers
-      if (serverConfig.command === 'npx' && serverConfig.args?.includes('mcp-remote@latest')) {
+      if (serverConfig.command === "npx" && serverConfig.args?.includes("mcp-remote@latest")) {
         // For remote MCP servers, OpenCode uses a different structure
-        const urlIndex = serverConfig.args.indexOf('mcp-remote@latest') + 1
+        const urlIndex = serverConfig.args.indexOf("mcp-remote@latest") + 1
         const url = serverConfig.args[urlIndex]
         const headers: Record<string, string> = {}
-        
+
         // Extract headers from args
-        let i = serverConfig.args.indexOf('--header') + 1
+        let i = serverConfig.args.indexOf("--header") + 1
         while (i > 0 && i < serverConfig.args.length) {
           const headerArg = serverConfig.args[i]
-          if (headerArg && !headerArg.startsWith('--')) {
-            const [key, value] = headerArg.split(':')
+          if (headerArg && !headerArg.startsWith("--")) {
+            const [key, value] = headerArg.split(":")
             if (key && value) {
               headers[key.trim()] = value.trim()
             }
           }
-          i = serverConfig.args.indexOf('--header', i) + 1
+          i = serverConfig.args.indexOf("--header", i) + 1
         }
-        
+
         servers[serverName] = {
-          type: 'remote',
+          type: "remote",
           url: url,
           enabled: true,
           headers: Object.keys(headers).length > 0 ? headers : undefined,
@@ -81,7 +81,7 @@ function setServerConfig(
       } else {
         // For local MCP servers
         servers[serverName] = {
-          type: 'local',
+          type: "local",
           command: serverConfig.command,
           args: serverConfig.args || [],
           enabled: true,
@@ -101,64 +101,64 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   header?: Array<string>
-  oauth?: 'yes' | 'no'
+  oauth?: "yes" | "no"
   project?: string
   env?: Array<string>
 }
 
-export const command = '$0 [target]'
-export const describe = 'Install MCP server'
+export const command = "$0 [target]"
+export const describe = "Install MCP server"
 
 export function builder(yargs: Argv<InstallArgv>): Argv {
   return yargs
-    .positional('target', {
-      type: 'string',
-      description: 'Package name, full command, or URL to install',
+    .positional("target", {
+      type: "string",
+      description: "Package name, full command, or URL to install",
     })
-    .option('name', {
-      type: 'string',
-      description: 'Name of the server (auto-extracted from target if not provided)',
+    .option("name", {
+      type: "string",
+      description: "Name of the server (auto-extracted from target if not provided)",
     })
-    .option('client', {
-      type: 'string',
-      description: 'Client to use for installation',
+    .option("client", {
+      type: "string",
+      description: "Client to use for installation",
       demandOption: true,
     })
-    .option('local', {
-      type: 'boolean',
-      description: 'Install to the local directory instead of the default location',
+    .option("local", {
+      type: "boolean",
+      description: "Install to the local directory instead of the default location",
       default: false,
     })
-    .option('yes', {
-      type: 'boolean',
-      alias: 'y',
-      description: 'Skip confirmation prompt',
+    .option("yes", {
+      type: "boolean",
+      alias: "y",
+      description: "Skip confirmation prompt",
       default: false,
     })
-    .option('header', {
-      type: 'array',
+    .option("header", {
+      type: "array",
       description: 'Headers to pass to the server (format: "Header: value")',
       default: [],
     })
-    .option('project', { type: 'string', description: 'Project for https://api.supermemory.ai/*' })
-    .option('oauth', {
-      type: 'string',
-      description: 'Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.',
-      choices: ['yes', 'no'],
+    .option("project", { type: "string", description: "Project for https://api.supermemory.ai/*" })
+    .option("oauth", {
+      type: "string",
+      description: "Whether the server uses OAuth authentication (yes/no). If not specified, you will be prompted.",
+      choices: ["yes", "no"],
     } as const)
-    .option('env', {
-      type: 'array',
-      description: 'Environment variables to pass to the server (format: --env key value)',
+    .option("env", {
+      type: "array",
+      description: "Environment variables to pass to the server (format: --env key value)",
       default: [],
     })
 }
 
 function isUrl(input: string): boolean {
-  return input.startsWith('http://') || input.startsWith('https://')
+  return input.startsWith("http://") || input.startsWith("https://")
 }
 
 function isCommand(input: string): boolean {
-  return input.includes(' ') || input.startsWith('npx ') || input.startsWith('node ')
+  return input.includes(" ") || input.startsWith("npx ") || input.startsWith("node ")
 }
 
 function inferNameFromInput(input: string): string {
@@ -166,23 +166,23 @@ function inferNameFromInput(input: string): string {
     // For URLs like https://example.com/path -> example-com
     try {
       const url = new URL(input)
-      return url.hostname.replace(/\./g, '-')
+      return url.hostname.replace(/\./g, "-")
     } catch {
       // Fallback for malformed URLs
-      const parts = input.split('/')
-      return parts[parts.length - 1] || 'server'
+      const parts = input.split("/")
+      return parts[parts.length - 1] || "server"
     }
   } else if (isCommand(input)) {
     // For commands, extract package name
-    const parts = input.split(' ')
-    if (parts[0] === 'npx' && parts.length > 1) {
+    const parts = input.split(" ")
+    if (parts[0] === "npx" && parts.length > 1) {
       // Skip flags like -y and get the package name
-      const packageIndex = parts.findIndex((part, index) => index > 0 && !part.startsWith('-'))
+      const packageIndex = parts.findIndex((part, index) => index > 0 && !part.startsWith("-"))
       if (packageIndex !== -1) {
-        return parts[packageIndex] || 'server'
+        return parts[packageIndex] || "server"
       }
     }
-    return parts[0] || 'server'
+    return parts[0] || "server"
   } else {
     // Simple package name like "mcp-server" or "@org/mcp-server"
     return input
@@ -203,7 +203,7 @@ function buildCommand(input: string): string {
 function isSupermemoryUrl(input: string): boolean {
   try {
     const url = new URL(input)
-    return url.hostname === 'api.supermemory.ai'
+    return url.hostname === "api.supermemory.ai"
   } catch {
     return false
   }
@@ -231,11 +231,11 @@ function parseEnvVars(envArray?: Array<string>): { [key: string]: string } | und
 async function runAuthentication(url: string): Promise<void> {
   logger.info(`Running authentication for ${url}`)
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['-y', '-p', 'mcp-remote@latest', 'mcp-remote-client', url], {
-      stdio: ['ignore', 'ignore', 'ignore'], // Hide all output
+    const child = spawn("npx", ["-y", "-p", "mcp-remote@latest", "mcp-remote-client", url], {
+      stdio: ["ignore", "ignore", "ignore"], // Hide all output
     })
 
-    child.on('close', (code) => {
+    child.on("close", (code) => {
       if (code === 0) {
         resolve()
       } else {
@@ -243,20 +243,20 @@ async function runAuthentication(url: string): Promise<void> {
       }
     })
 
-    child.on('error', reject)
+    child.on("error", reject)
   })
 }
 
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   if (!argv.client || !clientNames.includes(argv.client)) {
-    logger.error(`Invalid client: ${argv.client}. Available clients: ${clientNames.join(', ')}`)
+    logger.error(`Invalid client: ${argv.client}. Available clients: ${clientNames.join(", ")}`)
     return
   }
 
   let target = argv.target
   if (!target) {
-    target = (await logger.prompt('Enter the package name, command, or URL:', {
-      type: 'text',
+    target = (await logger.prompt("Enter the package name, command, or URL:", {
+      type: "text",
     })) as string
   }
 
@@ -267,48 +267,48 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
   // Resolve Supermemory project header when installing its URL
   let projectHeader: string | undefined
   if (isUrl(target) && isSupermemoryUrl(target)) {
-    let project = typeof argv.project === 'string' ? argv.project : undefined
-    if (!project || project.trim() === '') {
+    let project = typeof argv.project === "string" ? argv.project : undefined
+    if (!project || project.trim() === "") {
       const input = (await logger.prompt(
         'Enter your Supermemory project (no spaces). Press Enter for "default" (you can override per LLM session).',
-        { type: 'text' },
+        { type: "text" }
       )) as string
-      project = (input || '').trim() || 'default'
+      project = (input || "").trim() || "default"
     }
     if (/\s/.test(project)) {
-      logger.error('Project must not contain spaces. Use hyphens or underscores instead.')
+      logger.error("Project must not contain spaces. Use hyphens or underscores instead.")
       return
     }
     projectHeader = `x-sm-project:${project}`
   }
 
-  if (argv.client === 'warp') {
-    logger.log('')
-    logger.info('Warp requires a manual installation through their UI.')
-    logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
+  if (argv.client === "warp") {
+    logger.log("")
+    logger.info("Warp requires a manual installation through their UI.")
+    logger.log("  Please copy the following configuration object and add it to your Warp MCP config:\n")
 
     // Build args array for Warp
     let warpArgs: Array<string>
     if (isUrl(target)) {
-      warpArgs = ['-y', 'mcp-remote@latest', target]
+      warpArgs = ["-y", "mcp-remote@latest", target]
       // Add headers as arguments for supergateway
       if (argv.header && argv.header.length > 0) {
         for (const header of argv.header) {
-          warpArgs.push('--header', header)
+          warpArgs.push("--header", header)
         }
       }
       if (projectHeader) {
-        warpArgs.push('--header', projectHeader)
+        warpArgs.push("--header", projectHeader)
       }
     } else {
-      warpArgs = command.split(' ').slice(1)
+      warpArgs = command.split(" ").slice(1)
     }
 
     logger.log(
       JSON.stringify(
         {
           [name]: {
-            command: isUrl(target) ? 'npx' : command.split(' ')[0],
+            command: isUrl(target) ? "npx" : command.split(" ")[0],
             args: warpArgs,
             env: envVars || {},
             working_directory: null,
@@ -316,22 +316,22 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
           },
         },
         null,
-        2,
+        2
       )
-        .split('\n')
+        .split("\n")
         .map((line) => green(`  ${line}`))
-        .join('\n'),
+        .join("\n")
     )
-    logger.box("Read Warp's documentation at", blue('https://docs.warp.dev/knowledge-and-collaboration/mcp'))
+    logger.box("Read Warp's documentation at", blue("https://docs.warp.dev/knowledge-and-collaboration/mcp"))
     return
   }
 
-  logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? ' (locally)' : ''}`)
+  logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? " (locally)" : ""}`)
 
   let ready = argv.yes
   if (!ready) {
     ready = await logger.prompt(green(`Install MCP server "${name}" in ${argv.client}?`), {
-      type: 'confirm',
+      type: "confirm",
     })
   }
 
@@ -339,14 +339,14 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     if (isUrl(target)) {
       // Determine if we should use OAuth
       let usesOAuth: boolean
-      if (argv.oauth === 'yes') {
+      if (argv.oauth === "yes") {
         usesOAuth = true
-      } else if (argv.oauth === 'no') {
+      } else if (argv.oauth === "no") {
         usesOAuth = false
       } else {
         // Ask if the server uses OAuth
-        usesOAuth = await logger.prompt('Does this server use OAuth authentication?', {
-          type: 'confirm',
+        usesOAuth = await logger.prompt("Does this server use OAuth authentication?", {
+          type: "confirm",
         })
       }
 
@@ -354,7 +354,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         try {
           await runAuthentication(target)
         } catch {
-          logger.error('Authentication failed. Use the client to authenticate.')
+          logger.error("Authentication failed. Use the client to authenticate.")
           return
         }
       }
@@ -368,18 +368,18 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
       if (isUrl(target)) {
         // URL-based installation
 
-        const args = ['-y', 'mcp-remote@latest', target]
+        const args = ["-y", "mcp-remote@latest", target]
         // Add headers as arguments for supergateway
         if (argv.header && argv.header.length > 0) {
           for (const header of argv.header) {
-            args.push('--header', header)
+            args.push("--header", header)
           }
         }
         if (projectHeader) {
-          args.push('--header', projectHeader)
+          args.push("--header", projectHeader)
         }
         const serverConfig: ClientConfig = {
-          command: 'npx',
+          command: "npx",
           args: args,
         }
         if (envVars) {
@@ -388,7 +388,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         setServerConfig(config, configKey, name, serverConfig, argv.client)
       } else {
         // Command-based installation (including simple package names)
-        const cmdParts = command.split(' ')
+        const cmdParts = command.split(" ")
         const serverConfig: ClientConfig = {
           command: cmdParts[0],
           args: cmdParts.slice(1),
@@ -401,7 +401,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       writeConfig(config, argv.client, argv.local)
       logger.box(
-        green(`Successfully installed MCP server "${name}" in ${argv.client}${argv.local ? ' (locally)' : ''}`),
+        green(`Successfully installed MCP server "${name}" in ${argv.client}${argv.local ? " (locally)" : ""}`)
       )
     } catch (e) {
       logger.error(red((e as Error).message))

@@ -1,3 +1,3 @@
-import * as install from './install'
+import * as install from "./install"
 
 export const commands = [install]

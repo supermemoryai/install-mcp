@@ -34,6 +34,7 @@
   },
   "javascript": {
     "formatter": {
+      "quoteStyle": "double",
       "semicolons": "asNeeded",
       "trailingCommas": "es5",
       "quoteProperties": "asNeeded"
