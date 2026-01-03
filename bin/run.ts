@@ -1,4 +1,4 @@
-// biome-ignore lint/style/useImportType: <explanation>
+// biome-ignore lint/style/useImportType: yargs default export is needed for CLI initialization
 import yargs, { ArgumentsCamelCase, Argv } from 'yargs'
 import { config } from 'dotenv'
 import { builder, handler, type InstallArgv } from '../src/commands/install'

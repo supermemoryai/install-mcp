@@ -171,14 +171,15 @@ async function readFirstSseEvent(res: Response, timeoutMs: number): Promise<Firs
       buf += decoder.decode(value, { stream: true })
 
       // SSE frames are separated by a blank line.
-      let idx: number
-      while ((idx = buf.indexOf('\n\n')) !== -1) {
+      let idx = buf.indexOf('\n\n')
+      while (idx !== -1) {
         const frame = buf.slice(0, idx)
         buf = buf.slice(idx + 2)
+        idx = buf.indexOf('\n\n')
 
         // Parse single SSE frame.
         const lines = frame.split(/\r?\n/)
-        const dataLines: string[] = []
+        const dataLines: Array<string> = []
         for (const line of lines) {
           if (line.startsWith(':')) continue // comment
           const colon = line.indexOf(':')
