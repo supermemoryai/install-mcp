@@ -58,7 +58,7 @@ function setServerConfig(
         const urlIndex = serverConfig.args.indexOf('mcp-remote@latest') + 1
         const url = serverConfig.args[urlIndex]
         const headers: Record<string, string> = {}
-        
+
         // Extract headers from args
         let i = serverConfig.args.indexOf('--header') + 1
         while (i > 0 && i < serverConfig.args.length) {
@@ -71,7 +71,7 @@ function setServerConfig(
           }
           i = serverConfig.args.indexOf('--header', i) + 1
         }
-        
+
         servers[serverName] = {
           type: 'remote',
           url: url,
@@ -97,7 +97,7 @@ function setServerConfig(
 export interface InstallArgv {
   target?: string
   name?: string
-  client: string
+  client?: string
   local?: boolean
   yes?: boolean
   header?: Array<string>
@@ -122,7 +122,6 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
     .option('client', {
       type: 'string',
       description: 'Client to use for installation',
-      demandOption: true,
     })
     .option('local', {
       type: 'boolean',
@@ -248,9 +247,13 @@ async function runAuthentication(url: string): Promise<void> {
 }
 
 export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
-  if (!argv.client || !clientNames.includes(argv.client)) {
-    logger.error(`Invalid client: ${argv.client}. Available clients: ${clientNames.join(', ')}`)
-    return
+  let client = argv.client
+
+  if (!client || !clientNames.includes(client)) {
+    client = (await logger.prompt('Select a client to install for:', {
+      type: 'select',
+      options: clientNames.map((name) => ({ value: name, label: name })),
+    })) as string
   }
 
   let target = argv.target
@@ -282,7 +285,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     projectHeader = `x-sm-project:${project}`
   }
 
-  if (argv.client === 'warp') {
+  if (client === 'warp') {
     logger.log('')
     logger.info('Warp requires a manual installation through their UI.')
     logger.log('  Please copy the following configuration object and add it to your Warp MCP config:\n')
@@ -326,11 +329,11 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     return
   }
 
-  logger.info(`Installing MCP server "${name}" for ${argv.client}${argv.local ? ' (locally)' : ''}`)
+  logger.info(`Installing MCP server "${name}" for ${client}${argv.local ? ' (locally)' : ''}`)
 
   let ready = argv.yes
   if (!ready) {
-    ready = await logger.prompt(green(`Install MCP server "${name}" in ${argv.client}?`), {
+    ready = await logger.prompt(green(`Install MCP server "${name}" in ${client}?`), {
       type: 'confirm',
     })
   }
@@ -361,8 +364,8 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     }
 
     try {
-      const config = readConfig(argv.client, argv.local)
-      const configPath = getConfigPath(argv.client, argv.local)
+      const config = readConfig(client, argv.local)
+      const configPath = getConfigPath(client, argv.local)
       const configKey = configPath.configKey
 
       if (isUrl(target)) {
@@ -385,7 +388,7 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         if (envVars) {
           serverConfig.env = envVars
         }
-        setServerConfig(config, configKey, name, serverConfig, argv.client)
+        setServerConfig(config, configKey, name, serverConfig, client)
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(' ')
@@ -396,12 +399,12 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         if (envVars) {
           serverConfig.env = envVars
         }
-        setServerConfig(config, configKey, name, serverConfig, argv.client)
+        setServerConfig(config, configKey, name, serverConfig, client)
       }
 
-      writeConfig(config, argv.client, argv.local)
+      writeConfig(config, client, argv.local)
       logger.box(
-        green(`Successfully installed MCP server "${name}" in ${argv.client}${argv.local ? ' (locally)' : ''}`),
+        green(`Successfully installed MCP server "${name}" in ${client}${argv.local ? ' (locally)' : ''}`),
       )
     } catch (e) {
       logger.error(red((e as Error).message))
