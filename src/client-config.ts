@@ -314,6 +314,26 @@ export function writeConfig(config: ClientConfig, client?: string, local?: boole
   writeConfigFile(config, configPath)
 }
 
+// Detect indentation style from JSON content using jsonc-parser
+function detectIndent(text: string): { tabSize: number; insertSpaces: boolean } {
+  let result: { tabSize: number; insertSpaces: boolean } | null = null
+
+  jsonc.visit(text, {
+    onObjectProperty: (_property, offset, _length, startLine, startCharacter) => {
+      if (result === null && startLine > 0 && startCharacter > 0) {
+        const lineStart = text.lastIndexOf('\n', offset - 1) + 1
+        const whitespace = text.slice(lineStart, offset)
+        result = {
+          tabSize: startCharacter,
+          insertSpaces: !whitespace.includes('\t'),
+        }
+      }
+    },
+  })
+
+  return result || { tabSize: 2, insertSpaces: true }
+}
+
 // Helper function for deep merge
 function deepMerge(target: ClientConfig, source: ClientConfig): ClientConfig {
   const result = { ...target }
@@ -385,7 +405,7 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
       const configKeyPath = target.configKey.split('.')
       const newValue = getNestedValue(mergedConfig, target.configKey)
       const edits = jsonc.modify(originalFileContent, configKeyPath, newValue, {
-        formattingOptions: { tabSize: 2, insertSpaces: true },
+        formattingOptions: detectIndent(originalFileContent),
       })
       configContent = jsonc.applyEdits(originalFileContent, edits)
     } catch (error) {
