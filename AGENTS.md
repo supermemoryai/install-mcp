@@ -39,7 +39,7 @@ This is a CLI tool for installing and managing MCP (Model Context Protocol) serv
 
 **Desktop Applications:**
 
-- Claude Desktop (`claude`)
+- Claude Desktop (`claude-desktop`)
 - Cursor (`cursor`)
 - Windsurf (`windsurf`)
 - Witsy (`witsy`)
