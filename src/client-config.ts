@@ -57,7 +57,7 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
   const homeDir = os.homedir()
 
   return {
-    claude: { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
+    'claude-desktop': { type: 'file', path: defaultClaudePath, configKey: 'mcpServers' },
     droid: {
       type: 'file',
       path: path.join(homeDir, '.factory', 'mcp.json'),
@@ -175,23 +175,27 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
 }
 
 export const clientNames = [
-  'claude',
+  // Popular CLI tools & editors
+  'claude-code',
+  'cursor',
+  'opencode',
+  'vscode',
+  'codex',
+  'gemini-cli',
+  'zed',
   'droid',
+  'warp',
+  // Desktop apps
+  'claude-desktop',
+  'windsurf',
+  // VS Code extensions
   'cline',
   'roo-cline',
-  'windsurf',
+  // Other
+  'goose',
+  'aider',
   'witsy',
   'enconvo',
-  'cursor',
-  'warp',
-  'gemini-cli',
-  'vscode',
-  'claude-code',
-  'goose',
-  'zed',
-  'codex',
-  'opencode',
-  'aider',
   'aider-desk',
 ]
 
@@ -222,7 +226,7 @@ export function setNestedValue(obj: ClientConfig, path: string, value: ClientCon
 }
 
 export function getConfigPath(client?: string, local?: boolean): ClientInstallTarget {
-  const normalizedClient = client?.toLowerCase() || 'claude'
+  const normalizedClient = client?.toLowerCase() || 'claude-desktop'
   verbose(`Getting config path for client: ${normalizedClient}${local ? ' (local)' : ''}`)
 
   const clientPaths = getClientPaths()
@@ -231,7 +235,7 @@ export function getConfigPath(client?: string, local?: boolean): ClientInstallTa
     const { defaultClaudePath } = getBasePaths()
     return {
       type: 'file',
-      path: path.join(path.dirname(defaultClaudePath), '..', client || 'claude', `${normalizedClient}_config.json`),
+      path: path.join(path.dirname(defaultClaudePath), '..', client || 'claude-desktop', `${normalizedClient}_config.json`),
       configKey: 'mcpServers',
     }
   }

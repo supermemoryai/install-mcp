@@ -39,7 +39,7 @@ This is a CLI tool for installing and managing MCP (Model Context Protocol) serv
 
 **Desktop Applications:**
 
-- Claude Desktop (`claude`)
+- Claude Desktop (`claude-desktop`)
 - Cursor (`cursor`)
 - Windsurf (`windsurf`)
 - Witsy (`witsy`)
@@ -158,7 +158,7 @@ Add your client name to the `clientNames` array in `src/client-config.ts`:
 
 ```typescript
 export const clientNames = [
-  "claude",
+  "claude-desktop",
   "cline",
   "roo-cline",
   "windsurf",
@@ -380,7 +380,7 @@ mock.module("node:fs", () => ({
 describe("MCP installation", () => {
   it("should install package for different clients", async () => {
     const testCases = [
-      { client: "claude", expectedPath: /claude_desktop_config\.json/ },
+      { client: "claude-desktop", expectedPath: /claude_desktop_config\.json/ },
       { client: "cursor", expectedPath: /cursor.*mcp\.json/ },
       { client: "vscode", expectedPath: /settings\.json/ },
     ];

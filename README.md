@@ -11,25 +11,25 @@ The CLI now supports multiple installation methods with automatic detection:
 ### Simple package names
 
 ```bash
-npx install-mcp mcp-package-name --client claude
+npx install-mcp mcp-package-name --client claude-desktop
 ```
 
 ### Scoped packages
 
 ```bash
-npx install-mcp @org/mcp-server --client claude
+npx install-mcp @org/mcp-server --client claude-desktop
 ```
 
 ### Full commands (for custom arguments)
 
 ```bash
-npx install-mcp 'npx some-mcp-server --custom-args' --client claude
+npx install-mcp 'npx some-mcp-server --custom-args' --client claude-desktop
 ```
 
 ### Remote URLs (with automatic naming)
 
 ```bash
-npx install-mcp https://mcp.example.com/server --client claude
+npx install-mcp https://mcp.example.com/server --client claude-desktop
 ```
 
 The tool automatically:
@@ -70,10 +70,10 @@ You can pass headers for authentication or other purposes using the `--header` f
 
 ```bash
 # Single header
-npx install-mcp https://api.example.com/mcp --client claude --header "Authorization: Bearer token123"
+npx install-mcp https://api.example.com/mcp --client claude-desktop --header "Authorization: Bearer token123"
 
 # Multiple headers
-npx install-mcp https://api.example.com/mcp --client claude \
+npx install-mcp https://api.example.com/mcp --client claude-desktop \
   --header "Authorization: Bearer token123" \
   --header "X-API-Key: secret-key"
 ```
@@ -83,7 +83,7 @@ npx install-mcp https://api.example.com/mcp --client claude \
 When installing remote servers (URLs), the CLI will ask if the server uses OAuth authentication:
 
 ```bash
-npx install-mcp https://api.example.com/mcp --client claude
+npx install-mcp https://api.example.com/mcp --client claude-desktop
 # Output: Does this server use OAuth authentication? (Y/n)
 ```
 
@@ -91,10 +91,10 @@ You can bypass this prompt using the `--oauth` flag:
 
 ```bash
 # Automatically run OAuth authentication
-npx install-mcp https://api.example.com/mcp --client claude --oauth yes
+npx install-mcp https://api.example.com/mcp --client claude-desktop --oauth yes
 
 # Skip OAuth authentication entirely
-npx install-mcp https://api.example.com/mcp --client claude --oauth no
+npx install-mcp https://api.example.com/mcp --client claude-desktop --oauth no
 ```
 
 If you answer yes, the authentication flow:
@@ -122,7 +122,7 @@ This ensures secure access to remote servers while maintaining flexibility for s
 
 The `--client` flag specifies which MCP client you're installing for:
 
-- `claude`
+- `claude-desktop`
 - `cline`
 - `roo-cline`
 - `windsurf`
