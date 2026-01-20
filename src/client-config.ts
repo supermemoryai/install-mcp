@@ -175,23 +175,27 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
 }
 
 export const clientNames = [
-  'claude',
+  // Popular CLI tools & editors
+  'claude-code',
+  'cursor',
+  'opencode',
+  'vscode',
+  'codex',
+  'gemini-cli',
+  'zed',
   'droid',
+  'warp',
+  // Desktop apps
+  'claude',
+  'windsurf',
+  // VS Code extensions
   'cline',
   'roo-cline',
-  'windsurf',
+  // Other
+  'goose',
+  'aider',
   'witsy',
   'enconvo',
-  'cursor',
-  'warp',
-  'gemini-cli',
-  'vscode',
-  'claude-code',
-  'goose',
-  'zed',
-  'codex',
-  'opencode',
-  'aider',
   'aider-desk',
 ]
 
