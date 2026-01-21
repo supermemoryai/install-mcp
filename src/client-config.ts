@@ -279,11 +279,10 @@ export function readConfig(client: string, local?: boolean): ClientConfig {
       rawConfig = (yaml.load(fileContent) as ClientConfig) || {}
     } else if (configPath.format === 'toml') {
       rawConfig = TOML.parse(fileContent) as ClientConfig
-    } else if (configPath.path.endsWith('.jsonc')) {
-      // Use jsonc-parser for .jsonc files to support comments
-      rawConfig = jsonc.parse(fileContent) as ClientConfig
     } else {
-      rawConfig = JSON.parse(fileContent)
+      // Always use jsonc-parser for JSON files to support comments
+      // This handles both .json and .jsonc files with comments
+      rawConfig = jsonc.parse(fileContent) as ClientConfig
     }
 
     verbose(`Config loaded successfully: ${JSON.stringify(rawConfig, null, 2)}`)
@@ -317,6 +316,26 @@ export function writeConfig(config: ClientConfig, client?: string, local?: boole
   }
 
   writeConfigFile(config, configPath)
+}
+
+// Detect indentation style from JSON content using jsonc-parser
+function detectIndent(text: string): { tabSize: number; insertSpaces: boolean } {
+  let result: { tabSize: number; insertSpaces: boolean } | null = null
+
+  jsonc.visit(text, {
+    onObjectProperty: (_property, offset, _length, startLine, startCharacter) => {
+      if (result === null && startLine > 0 && startCharacter > 0) {
+        const lineStart = text.lastIndexOf('\n', offset - 1) + 1
+        const whitespace = text.slice(lineStart, offset)
+        result = {
+          tabSize: startCharacter,
+          insertSpaces: !whitespace.includes('\t'),
+        }
+      }
+    },
+  })
+
+  return result || { tabSize: 2, insertSpaces: true }
 }
 
 // Helper function for deep merge
@@ -356,11 +375,9 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
         existingConfig = (yaml.load(originalFileContent) as ClientConfig) || {}
       } else if (target.format === 'toml') {
         existingConfig = TOML.parse(originalFileContent) as ClientConfig
-      } else if (target.path.endsWith('.jsonc')) {
-        // Use jsonc-parser for .jsonc files to support comments
-        existingConfig = jsonc.parse(originalFileContent) as ClientConfig
       } else {
-        existingConfig = JSON.parse(originalFileContent)
+        // Always use jsonc-parser for JSON files to support comments
+        existingConfig = jsonc.parse(originalFileContent) as ClientConfig
       }
 
       verbose(`Existing config loaded: ${JSON.stringify(existingConfig, null, 2)}`)
@@ -385,24 +402,16 @@ function writeConfigFile(config: ClientConfig, target: ClientFileTarget): void {
     })
   } else if (target.format === 'toml') {
     configContent = TOML.stringify(mergedConfig)
-  } else if (target.path.endsWith('.jsonc') && originalFileContent) {
-    // For .jsonc files, try to preserve comments and formatting using jsonc-parser
+  } else if (originalFileContent) {
+    // For JSON/JSONC files with existing content, use jsonc-parser to preserve comments
     try {
-      // Apply modifications to preserve existing structure
-      const editedContent = originalFileContent
-      const modifications: Array<jsonc.Edit> = []
-
-      // Generate edit operations for each key in the merged config
-      for (const key of Object.keys(mergedConfig)) {
-        const path = [key]
-        const edits = jsonc.modify(editedContent, path, mergedConfig[key], {
-          formattingOptions: { tabSize: 2, insertSpaces: true },
-        })
-        modifications.push(...edits)
-      }
-
-      // Apply all edits
-      configContent = jsonc.applyEdits(originalFileContent, modifications)
+      // Only modify the specific configKey path, preserving everything else
+      const configKeyPath = target.configKey.split('.')
+      const newValue = getNestedValue(mergedConfig, target.configKey)
+      const edits = jsonc.modify(originalFileContent, configKeyPath, newValue, {
+        formattingOptions: detectIndent(originalFileContent),
+      })
+      configContent = jsonc.applyEdits(originalFileContent, edits)
     } catch (error) {
       // Fallback to standard JSON.stringify if edit fails
       verbose(`Error applying JSONC edits: ${error instanceof Error ? error.message : String(error)}`)
