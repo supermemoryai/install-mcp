@@ -1,4 +1,5 @@
 import type { ArgumentsCamelCase, Argv } from "yargs"
+import process from "node:process"
 import { logger } from "../logger"
 import { blue, green, red } from "picocolors"
 import {
@@ -11,6 +12,18 @@ import {
   type ClientConfig,
 } from "../client-config"
 import { spawn } from "node:child_process"
+
+const isWindows = process.platform === "win32"
+
+// On Windows, shell scripts like `npx` cannot be spawned directly by MCP clients
+// because they use child_process.spawn() without shell:true. The standard workaround
+// is to wrap the command with `cmd /c` so Windows can resolve the .cmd/.ps1 shim.
+function wrapCommandForPlatform(command: string, args: Array<string>): { command: string; args: Array<string> } {
+  if (isWindows) {
+    return { command: "cmd", args: ["/c", command, ...args] }
+  }
+  return { command, args }
+}
 
 // Helper to set a server config in a nested structure
 function setServerConfig(
@@ -53,7 +66,12 @@ function setServerConfig(
       }
     } else if (client === "opencode") {
       // OpenCode has a different config structure for MCP servers
-      if (serverConfig.command === "npx" && serverConfig.args?.includes("mcp-remote@latest")) {
+      // Check for npx directly or wrapped via cmd /c npx (Windows)
+      const isNpxCommand =
+        serverConfig.command === "npx" ||
+        (serverConfig.command === "cmd" && serverConfig.args?.[0] === "/c" && serverConfig.args?.[1] === "npx")
+      const isNpxMcpRemote = isNpxCommand && serverConfig.args?.includes("mcp-remote@latest")
+      if (isNpxMcpRemote) {
         // For remote MCP servers, OpenCode uses a different structure
         const urlIndex = serverConfig.args.indexOf("mcp-remote@latest") + 1
         const url = serverConfig.args[urlIndex]
@@ -232,6 +250,7 @@ async function runAuthentication(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn("npx", ["-y", "-p", "mcp-remote@latest", "mcp-remote-client", url], {
       stdio: ["ignore", "ignore", "ignore"], // Hide all output
+      shell: isWindows, // Required on Windows where npx is a .cmd script
     })
 
     child.on("close", (code) => {
@@ -381,9 +400,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
         if (projectHeader) {
           args.push("--header", projectHeader)
         }
+        const wrapped = wrapCommandForPlatform("npx", args)
         const serverConfig: ClientConfig = {
-          command: "npx",
-          args: args,
+          command: wrapped.command,
+          args: wrapped.args,
         }
         if (envVars) {
           serverConfig.env = envVars
@@ -392,9 +412,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
       } else {
         // Command-based installation (including simple package names)
         const cmdParts = command.split(" ")
+        const wrapped = wrapCommandForPlatform(cmdParts[0] || command, cmdParts.slice(1))
         const serverConfig: ClientConfig = {
-          command: cmdParts[0],
-          args: cmdParts.slice(1),
+          command: wrapped.command,
+          args: wrapped.args,
         }
         if (envVars) {
           serverConfig.env = envVars
