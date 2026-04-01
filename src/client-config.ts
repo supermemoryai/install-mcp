@@ -128,6 +128,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       localPath: path.join(process.cwd(), ".mcp.json"),
       configKey: "mcpServers",
     },
+    kilocode: {
+      type: "file",
+      path: path.join(baseDir, vscodePath, "globalStorage", "kilo.kilo-code", "settings", "mcp_settings.json"),
+      localPath: path.join(process.cwd(), ".kilocode", "mcp.json"),
+      configKey: "mcpServers",
+    },
     goose: {
       type: "file",
       path: path.join(homeDir, ".config", "goose", "config.yaml"),
@@ -191,6 +197,7 @@ export const clientNames = [
   // VS Code extensions
   "cline",
   "roo-cline",
+  "kilocode",
   // Other
   "goose",
   "aider",
