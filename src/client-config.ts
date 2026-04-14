@@ -128,6 +128,12 @@ function getClientPaths(): { [key: string]: ClientInstallTarget } {
       localPath: path.join(process.cwd(), ".mcp.json"),
       configKey: "mcpServers",
     },
+    nanobot: {
+      type: "file",
+      path: path.join(homeDir, ".nanobot", "config.json"),
+      localPath: path.join(process.cwd(), ".nanobot", "config.json"),
+      configKey: "tools.mcpServers",
+    },
     goose: {
       type: "file",
       path: path.join(homeDir, ".config", "goose", "config.yaml"),
@@ -185,6 +191,7 @@ export const clientNames = [
   "zed",
   "droid",
   "warp",
+  "nanobot",
   // Desktop apps
   "claude-desktop",
   "windsurf",
